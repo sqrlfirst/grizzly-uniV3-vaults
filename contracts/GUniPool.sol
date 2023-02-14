@@ -1,14 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.4;
 
-import { IUniswapV3MintCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
-import { IUniswapV3SwapCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+import {
+	IUniswapV3MintCallback
+} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
+import {
+	IUniswapV3SwapCallback
+} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import { GUniPoolStorage } from "./abstract/GUniPoolStorage.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import { IUniswapV3Factory } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {
+	IUniswapV3Factory
+} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import { TickMath } from "./vendor/uniswap/TickMath.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {
+	IERC20Metadata
+} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { FullMath, LiquidityAmounts } from "./vendor/uniswap/LiquidityAmounts.sol";
 
@@ -252,11 +260,8 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 
 		uint256 liquidityBurned_ = FullMath.mulDiv(burnAmount, liquidity, totalSupply);
 		liquidityBurned = SafeCast.toUint128(liquidityBurned_);
-		(uint256 burn0, uint256 burn1, uint256 fee0, uint256 fee1) = _withdraw(
-			lowerTick,
-			upperTick,
-			liquidityBurned
-		);
+		(uint256 burn0, uint256 burn1, uint256 fee0, uint256 fee1) =
+			_withdraw(lowerTick, upperTick, liquidityBurned);
 		_applyFees(fee0, fee1);
 		(fee0, fee1) = _subtractAdminFees(fee0, fee1);
 		emit FeesEarned(fee0, fee1);
@@ -385,12 +390,8 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		external
 		gelatofy(feeAmount, feeToken)
 	{
-		(uint256 amount0, uint256 amount1) = _balancesToWithdraw(
-			managerBalance0,
-			managerBalance1,
-			feeAmount,
-			feeToken
-		);
+		(uint256 amount0, uint256 amount1) =
+			_balancesToWithdraw(managerBalance0, managerBalance1, feeAmount, feeToken);
 
 		managerBalance0 = 0;
 		managerBalance1 = 0;
@@ -410,12 +411,8 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		external
 		gelatofy(feeAmount, feeToken)
 	{
-		(uint256 amount0, uint256 amount1) = _balancesToWithdraw(
-			gelatoBalance0,
-			gelatoBalance1,
-			feeAmount,
-			feeToken
-		);
+		(uint256 amount0, uint256 amount1) =
+			_balancesToWithdraw(gelatoBalance0, gelatoBalance1, feeAmount, feeToken);
 
 		gelatoBalance0 = 0;
 		gelatoBalance1 = 0;
@@ -474,13 +471,14 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			);
 		} else {
 			(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
-			uint128 newLiquidity = LiquidityAmounts.getLiquidityForAmounts(
-				sqrtRatioX96,
-				lowerTick.getSqrtRatioAtTick(),
-				upperTick.getSqrtRatioAtTick(),
-				amount0Max,
-				amount1Max
-			);
+			uint128 newLiquidity =
+				LiquidityAmounts.getLiquidityForAmounts(
+					sqrtRatioX96,
+					lowerTick.getSqrtRatioAtTick(),
+					upperTick.getSqrtRatioAtTick(),
+					amount0Max,
+					amount1Max
+				);
 			mintAmount = uint256(newLiquidity);
 			(amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(
 				sqrtRatioX96,
@@ -537,10 +535,10 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		);
 
 		// compute current fees earned
-		uint256 fee0 = _computeFeesEarned(true, feeGrowthInside0Last, tick, liquidity) +
-			uint256(tokensOwed0);
-		uint256 fee1 = _computeFeesEarned(false, feeGrowthInside1Last, tick, liquidity) +
-			uint256(tokensOwed1);
+		uint256 fee0 =
+			_computeFeesEarned(true, feeGrowthInside0Last, tick, liquidity) + uint256(tokensOwed0);
+		uint256 fee1 =
+			_computeFeesEarned(false, feeGrowthInside1Last, tick, liquidity) + uint256(tokensOwed1);
 
 		(fee0, fee1) = _subtractAdminFees(fee0, fee1);
 
@@ -571,11 +569,8 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		uint256 leftover0 = token0.balanceOf(address(this)) - managerBalance0 - gelatoBalance0;
 		uint256 leftover1 = token1.balanceOf(address(this)) - managerBalance1 - gelatoBalance1;
 
-		(, , uint256 feesEarned0, uint256 feesEarned1) = _withdraw(
-			lowerTick,
-			upperTick,
-			liquidity
-		);
+		(, , uint256 feesEarned0, uint256 feesEarned1) =
+			_withdraw(lowerTick, upperTick, liquidity);
 		_applyFees(feesEarned0, feesEarned1);
 		(feesEarned0, feesEarned1) = _subtractAdminFees(feesEarned0, feesEarned1);
 		emit FeesEarned(feesEarned0, feesEarned1);
@@ -650,28 +645,23 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 	) private {
 		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
 		// First, deposit as much as we can
-		uint128 baseLiquidity = LiquidityAmounts.getLiquidityForAmounts(
-			sqrtRatioX96,
-			lowerTick_.getSqrtRatioAtTick(),
-			upperTick_.getSqrtRatioAtTick(),
-			amount0,
-			amount1
-		);
-		if (baseLiquidity > 0) {
-			(uint256 amountDeposited0, uint256 amountDeposited1) = pool.mint(
-				address(this),
-				lowerTick_,
-				upperTick_,
-				baseLiquidity,
-				""
+		uint128 baseLiquidity =
+			LiquidityAmounts.getLiquidityForAmounts(
+				sqrtRatioX96,
+				lowerTick_.getSqrtRatioAtTick(),
+				upperTick_.getSqrtRatioAtTick(),
+				amount0,
+				amount1
 			);
+		if (baseLiquidity > 0) {
+			(uint256 amountDeposited0, uint256 amountDeposited1) =
+				pool.mint(address(this), lowerTick_, upperTick_, baseLiquidity, "");
 
 			amount0 -= amountDeposited0;
 			amount1 -= amountDeposited1;
 		}
-		int256 swapAmount = SafeCast.toInt256(
-			((zeroForOne ? amount0 : amount1) * swapAmountBPS) / 10000
-		);
+		int256 swapAmount =
+			SafeCast.toInt256(((zeroForOne ? amount0 : amount1) * swapAmountBPS) / 10000);
 		if (swapAmount > 0) {
 			_swapAndDeposit(
 				lowerTick_,
@@ -694,25 +684,21 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		uint160 swapThresholdPrice,
 		bool zeroForOne
 	) private returns (uint256 finalAmount0, uint256 finalAmount1) {
-		(int256 amount0Delta, int256 amount1Delta) = pool.swap(
-			address(this),
-			zeroForOne,
-			swapAmount,
-			swapThresholdPrice,
-			""
-		);
+		(int256 amount0Delta, int256 amount1Delta) =
+			pool.swap(address(this), zeroForOne, swapAmount, swapThresholdPrice, "");
 		finalAmount0 = uint256(SafeCast.toInt256(amount0) - amount0Delta);
 		finalAmount1 = uint256(SafeCast.toInt256(amount1) - amount1Delta);
 
 		// Add liquidity a second time
 		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
-		uint128 liquidityAfterSwap = LiquidityAmounts.getLiquidityForAmounts(
-			sqrtRatioX96,
-			lowerTick_.getSqrtRatioAtTick(),
-			upperTick_.getSqrtRatioAtTick(),
-			finalAmount0,
-			finalAmount1
-		);
+		uint128 liquidityAfterSwap =
+			LiquidityAmounts.getLiquidityForAmounts(
+				sqrtRatioX96,
+				lowerTick_.getSqrtRatioAtTick(),
+				upperTick_.getSqrtRatioAtTick(),
+				finalAmount0,
+				finalAmount1
+			);
 		if (liquidityAfterSwap > 0) {
 			pool.mint(address(this), lowerTick_, upperTick_, liquidityAfterSwap, "");
 		}
@@ -829,9 +815,10 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		require(tickCumulatives.length == 2, "array len");
 		uint160 avgSqrtRatioX96;
 		unchecked {
-			int24 avgTick = int24(
-				(tickCumulatives[1] - tickCumulatives[0]) / int56(uint56(gelatoSlippageInterval))
-			);
+			int24 avgTick =
+				int24(
+					(tickCumulatives[1] - tickCumulatives[0]) / int56(uint56(gelatoSlippageInterval))
+				);
 			avgSqrtRatioX96 = avgTick.getSqrtRatioAtTick();
 		}
 
