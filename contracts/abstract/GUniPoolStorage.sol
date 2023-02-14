@@ -47,7 +47,12 @@ abstract contract GUniPoolStorage is
 	IERC20 public token1;
 
 	uint256 internal constant MIN_INITIAL_SHARES = 1e9;
-	// APPPEND ADDITIONAL STATE VARS BELOW:
+
+	bool internal isOriginal = true; // check for cloning
+
+	address public immutable factory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+
+	// APPEND ADDITIONAL STATE VARS BELOW:
 	// XXXXXXXX DO NOT MODIFY ORDERING XXXXXXXX
 
 	event UpdateAdminTreasury(address oldAdminTreasury, address newAdminTreasury);
@@ -90,7 +95,7 @@ abstract contract GUniPoolStorage is
 		token1 = IERC20(pool.token1());
 		managerFeeBPS = _managerFeeBPS; // if set to 0 here manager can still initialize later
 
-		// these variables can be udpated by the manager
+		// these variables can be updated by the manager
 		gelatoSlippageInterval = 5 minutes; // default: last five minutes;
 		gelatoSlippageBPS = 500; // default: 5% slippage
 		gelatoWithdrawBPS = 100; // default: only auto withdraw if tx fee is lt 1% withdrawn
