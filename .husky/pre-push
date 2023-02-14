@@ -2,4 +2,3 @@
 . "$(dirname "$0")/_/husky.sh"
 
 # git fetch origin && HUSKY=0 git rebase origin/master && yarn test
-git fetch origin && HUSKY=0 git rebase origin/master
