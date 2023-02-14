@@ -45,6 +45,8 @@ abstract contract GUniPoolStorage is
 	IUniswapV3Pool public pool;
 	IERC20 public token0;
 	IERC20 public token1;
+
+	uint256 internal constant MIN_INITIAL_SHARES = 1e9;
 	// APPPEND ADDITIONAL STATE VARS BELOW:
 	// XXXXXXXX DO NOT MODIFY ORDERING XXXXXXXX
 

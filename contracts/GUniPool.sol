@@ -69,7 +69,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 	// User functions => Should be called via a Router
 
 	/// @notice mint fungible G-UNI tokens, fractional shares of a Uniswap V3 position
-	/// @dev to compute the amouint of tokens necessary to mint `mintAmount` see getMintAmounts
+	/// @dev to compute the amount of tokens necessary to mint `mintAmount` see getMintAmounts
 	/// @param mintAmount The number of G-UNI tokens to mint
 	/// @param receiver The account to receive the minted tokens
 	/// @return amount0 amount of token0 transferred from msg.sender to mint `mintAmount`
@@ -97,6 +97,11 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			amount0 = FullMath.mulDivRoundingUp(amount0Current, mintAmount, totalSupply);
 			amount1 = FullMath.mulDivRoundingUp(amount1Current, mintAmount, totalSupply);
 		} else {
+			// prevent first staker from stealing funds of subsequent stakers
+			// solhint-disable-next-line max-line-length
+			// see https://code4rena.com/reports/2022-01-sherlock/#h-01-first-user-can-steal-everyone-elses-tokens
+			require(mintAmount > MIN_INITIAL_SHARES, "min shares");
+
 			// if supply is 0 mintAmount == liquidity to deposit
 			(amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(
 				sqrtRatioX96,
