@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.4;
 
-import { Gelatofied } from "./Gelatofied.sol";
 import { OwnableUninitialized } from "./OwnableUninitialized.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -15,8 +14,7 @@ import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC2
 abstract contract GUniPoolStorage is
 	ERC20Upgradeable, /* XXXX DONT MODIFY ORDERING XXXX */
 	ReentrancyGuardUpgradeable,
-	OwnableUninitialized,
-	Gelatofied
+	OwnableUninitialized
 	// APPEND ADDITIONAL BASE WITH STATE VARS BELOW:
 	// XXXX DONT MODIFY ORDERING XXXX
 {
@@ -39,8 +37,6 @@ abstract contract GUniPoolStorage is
 
 	uint256 public managerBalance0;
 	uint256 public managerBalance1;
-	uint256 public gelatoBalance0;
-	uint256 public gelatoBalance1;
 
 	IUniswapV3Pool public pool;
 	IERC20 public token0;
@@ -51,6 +47,8 @@ abstract contract GUniPoolStorage is
 	bool internal isOriginal = true; // check for cloning
 
 	address public immutable factory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+
+	address public keeperAddress;
 
 	// APPEND ADDITIONAL STATE VARS BELOW:
 	// XXXXXXXX DO NOT MODIFY ORDERING XXXXXXXX
@@ -66,15 +64,17 @@ abstract contract GUniPoolStorage is
 
 	event SetManagerFee(uint16 managerFee);
 
-	// solhint-disable-next-line max-line-length
-	constructor(address payable _gelato) Gelatofied(_gelato) {} // solhint-disable-line no-empty-blocks
+	modifier onlyAuthorized() {
+		require(msg.sender == manager() || msg.sender == keeperAddress, "not authorized");
+		_;
+	}
 
 	/// @notice initialize storage variables on a new G-UNI pool, only called once
 	/// @param _name name of G-UNI token
 	/// @param _symbol symbol of G-UNI token
 	/// @param _pool address of Uniswap V3 pool
 	/// @param _managerFeeBPS proportion of fees earned that go to manager treasury
-	/// note that the 4 above params are NOT UPDATEABLE AFTER INILIALIZATION
+	/// note that the 4 above params are NOT UPDATABLE AFTER INITIALIZATION
 	/// @param _lowerTick initial lowerTick (only changeable with executiveRebalance)
 	/// @param _lowerTick initial upperTick (only changeable with executiveRebalance)
 	/// @param _manager_ address of manager (ownership can be transferred)
@@ -167,5 +167,10 @@ abstract contract GUniPoolStorage is
 
 	function _getPositionID() internal view returns (bytes32 positionID) {
 		return keccak256(abi.encodePacked(address(this), lowerTick, upperTick));
+	}
+
+	function setKeeperAddress(address _keeperAddress) external onlyManager {
+		require(_keeperAddress != address(0), "zeroAddress");
+		keeperAddress = _keeperAddress;
 	}
 }

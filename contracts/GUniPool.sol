@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
+
 pragma solidity 0.8.4;
 
 import { IUniswapV3MintCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
@@ -40,9 +41,6 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 	);
 
 	event FeesEarned(uint256 feesEarned0, uint256 feesEarned1);
-
-	// solhint-disable-next-line max-line-length
-	constructor(address payable _gelato) GUniPoolStorage(_gelato) {} // solhint-disable-line no-empty-blocks
 
 	/// @notice Uniswap V3 callback fn, called back on pool.mint
 	function uniswapV3MintCallback(
@@ -189,12 +187,12 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			amount0 = FullMath.mulDivRoundingUp(amount0Current, mintAmount, totalSupply);
 			amount1 = FullMath.mulDivRoundingUp(amount1Current, mintAmount, totalSupply);
 		} else {
-			// prevent first staker from stealing funds of subsequent stakers
+			// Prevent first staker from stealing funds of subsequent stakers
 			// solhint-disable-next-line max-line-length
-			// see https://code4rena.com/reports/2022-01-sherlock/#h-01-first-user-can-steal-everyone-elses-tokens
+			// https://code4rena.com/reports/2022-01-sherlock/#h-01-first-user-can-steal-everyone-elses-tokens
 			require(mintAmount > MIN_INITIAL_SHARES, "min shares");
 
-			// if supply is 0 mintAmount == liquidity to deposit
+			// If supply is 0 mintAmount == liquidity to deposit
 			(amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(
 				sqrtRatioX96,
 				lowerTick.getSqrtRatioAtTick(),
@@ -203,7 +201,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			);
 		}
 
-		// transfer amounts owed to contract
+		// Transfer amounts owed to contract
 		if (amount0 > 0) {
 			token0.safeTransferFrom(msg.sender, address(this), amount0);
 		}
@@ -211,7 +209,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			token1.safeTransferFrom(msg.sender, address(this), amount1);
 		}
 
-		// deposit as much new liquidity as possible
+		// Deposit as much new liquidity as possible
 		liquidityMinted = LiquidityAmounts.getLiquidityForAmounts(
 			sqrtRatioX96,
 			lowerTick.getSqrtRatioAtTick(),
@@ -251,27 +249,29 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		_burn(msg.sender, burnAmount);
 
 		uint256 liquidityBurned_ = FullMath.mulDiv(burnAmount, liquidity, totalSupply);
+
 		liquidityBurned = SafeCast.toUint128(liquidityBurned_);
+
 		(uint256 burn0, uint256 burn1, uint256 fee0, uint256 fee1) = _withdraw(
 			lowerTick,
 			upperTick,
 			liquidityBurned
 		);
-		_applyFees(fee0, fee1);
-		(fee0, fee1) = _subtractAdminFees(fee0, fee1);
-		emit FeesEarned(fee0, fee1);
+
+		(fee0, fee1) = _applyFees(fee0, fee1);
 
 		amount0 =
 			burn0 +
 			FullMath.mulDiv(
-				token0.balanceOf(address(this)) - burn0 - managerBalance0 - gelatoBalance0,
+				token0.balanceOf(address(this)) - burn0 - managerBalance0,
 				burnAmount,
 				totalSupply
 			);
+
 		amount1 =
 			burn1 +
 			FullMath.mulDiv(
-				token1.balanceOf(address(this)) - burn1 - managerBalance1 - gelatoBalance1,
+				token1.balanceOf(address(this)) - burn1 - managerBalance1,
 				burnAmount,
 				totalSupply
 			);
@@ -311,21 +311,20 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 	) external onlyManager {
 		uint128 liquidity;
 		uint128 newLiquidity;
+
 		if (totalSupply() > 0) {
 			(liquidity, , , , ) = pool.positions(_getPositionID());
 			if (liquidity > 0) {
 				(, , uint256 fee0, uint256 fee1) = _withdraw(lowerTick, upperTick, liquidity);
 
-				_applyFees(fee0, fee1);
-				(fee0, fee1) = _subtractAdminFees(fee0, fee1);
-				emit FeesEarned(fee0, fee1);
+				(fee0, fee1) = _applyFees(fee0, fee1);
 			}
 
 			lowerTick = newLowerTick;
 			upperTick = newUpperTick;
 
-			uint256 reinvest0 = token0.balanceOf(address(this)) - managerBalance0 - gelatoBalance0;
-			uint256 reinvest1 = token1.balanceOf(address(this)) - managerBalance1 - gelatoBalance1;
+			uint256 reinvest0 = token0.balanceOf(address(this)) - managerBalance0;
+			uint256 reinvest1 = token1.balanceOf(address(this)) - managerBalance1;
 
 			_deposit(
 				newLowerTick,
@@ -347,30 +346,22 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		emit Rebalance(newLowerTick, newUpperTick, liquidity, newLiquidity);
 	}
 
-	// Gelatofied functions => Automatically called by Gelato
+	// Authorized functions => Can be automated
 
-	/// @notice Reinvest fees earned into underlying position, only gelato executors can call
-	/// Position bounds CANNOT be altered by gelato, only manager may via executiveRebalance.
-	/// Frequency of rebalance configured with gelatoRebalanceBPS, alterable by manager.
+	/// @notice Reinvest fees earned into underlying position, only authorized executors can call.
+	/// Position bounds CANNOT be altered, only manager may via executiveRebalance.
 	function rebalance(
 		uint160 swapThresholdPrice,
 		uint256 swapAmountBPS,
-		bool zeroForOne,
-		uint256 feeAmount,
-		address paymentToken
-	) external gelatofy(feeAmount, paymentToken) {
+		bool zeroForOne
+	) external onlyAuthorized {
 		if (swapAmountBPS > 0) {
 			_checkSlippage(swapThresholdPrice, zeroForOne);
 		}
+
 		(uint128 liquidity, , , , ) = pool.positions(_getPositionID());
-		_rebalance(
-			liquidity,
-			swapThresholdPrice,
-			swapAmountBPS,
-			zeroForOne,
-			feeAmount,
-			paymentToken
-		);
+
+		_rebalance(liquidity, swapThresholdPrice, swapAmountBPS, zeroForOne);
 
 		(uint128 newLiquidity, , , , ) = pool.positions(_getPositionID());
 		require(newLiquidity > liquidity, "liquidity must increase");
@@ -378,19 +369,11 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		emit Rebalance(lowerTick, upperTick, liquidity, newLiquidity);
 	}
 
-	/// @notice withdraw manager fees accrued, only gelato executors can call.
-	/// Target account to receive fees is managerTreasury, alterable by manager.
-	/// Frequency of withdrawals configured with gelatoWithdrawBPS, alterable by manager.
-	function withdrawManagerBalance(uint256 feeAmount, address feeToken)
-		external
-		gelatofy(feeAmount, feeToken)
-	{
-		(uint256 amount0, uint256 amount1) = _balancesToWithdraw(
-			managerBalance0,
-			managerBalance1,
-			feeAmount,
-			feeToken
-		);
+	/// @notice withdraw manager fees accrued, only authorized executors can call.
+	/// Target account to receive fees is managerTreasury, alterable by only manager.
+	function withdrawManagerBalance() external onlyAuthorized {
+		uint256 amount0 = managerBalance0;
+		uint256 amount1 = managerBalance1;
 
 		managerBalance0 = 0;
 		managerBalance1 = 0;
@@ -401,50 +384,6 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 
 		if (amount1 > 0) {
 			token1.safeTransfer(managerTreasury, amount1);
-		}
-	}
-
-	/// @notice withdraw gelato fees accrued, only gelato executors can call.
-	/// Frequency of withdrawals configured with gelatoWithdrawBPS, alterable by manager.
-	function withdrawGelatoBalance(uint256 feeAmount, address feeToken)
-		external
-		gelatofy(feeAmount, feeToken)
-	{
-		(uint256 amount0, uint256 amount1) = _balancesToWithdraw(
-			gelatoBalance0,
-			gelatoBalance1,
-			feeAmount,
-			feeToken
-		);
-
-		gelatoBalance0 = 0;
-		gelatoBalance1 = 0;
-
-		if (amount0 > 0) {
-			token0.safeTransfer(GELATO, amount0);
-		}
-
-		if (amount1 > 0) {
-			token1.safeTransfer(GELATO, amount1);
-		}
-	}
-
-	function _balancesToWithdraw(
-		uint256 balance0,
-		uint256 balance1,
-		uint256 feeAmount,
-		address feeToken
-	) internal view returns (uint256 amount0, uint256 amount1) {
-		if (feeToken == address(token0)) {
-			require((balance0 * gelatoWithdrawBPS) / 10000 >= feeAmount, "high fee");
-			amount0 = balance0 - feeAmount;
-			amount1 = balance1;
-		} else if (feeToken == address(token1)) {
-			require((balance1 * gelatoWithdrawBPS) / 10000 >= feeAmount, "high fee");
-			amount1 = balance1 - feeAmount;
-			amount0 = balance0;
-		} else {
-			revert("wrong token");
 		}
 	}
 
@@ -528,7 +467,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			uint128 tokensOwed1
 		) = pool.positions(_getPositionID());
 
-		// compute current holdings from liquidity
+		// Compute current holdings from liquidity
 		(amount0Current, amount1Current) = LiquidityAmounts.getAmountsForLiquidity(
 			sqrtRatioX96,
 			lowerTick.getSqrtRatioAtTick(),
@@ -536,25 +475,18 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			liquidity
 		);
 
-		// compute current fees earned
+		// Compute current fees earned
 		uint256 fee0 = _computeFeesEarned(true, feeGrowthInside0Last, tick, liquidity) +
 			uint256(tokensOwed0);
 		uint256 fee1 = _computeFeesEarned(false, feeGrowthInside1Last, tick, liquidity) +
 			uint256(tokensOwed1);
 
-		(fee0, fee1) = _subtractAdminFees(fee0, fee1);
+		fee0 = (fee0 * (10000 - managerFeeBPS)) / 10000;
+		fee1 = (fee1 * (10000 - managerFeeBPS)) / 10000;
 
-		// add any leftover in contract to current holdings
-		amount0Current +=
-			fee0 +
-			token0.balanceOf(address(this)) -
-			managerBalance0 -
-			gelatoBalance0;
-		amount1Current +=
-			fee1 +
-			token1.balanceOf(address(this)) -
-			managerBalance1 -
-			gelatoBalance1;
+		// Add any leftover in contract to current holdings
+		amount0Current += fee0 + token0.balanceOf(address(this)) - managerBalance0;
+		amount1Current += fee1 + token1.balanceOf(address(this)) - managerBalance1;
 	}
 
 	// Private functions
@@ -564,43 +496,21 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		uint128 liquidity,
 		uint160 swapThresholdPrice,
 		uint256 swapAmountBPS,
-		bool zeroForOne,
-		uint256 feeAmount,
-		address paymentToken
+		bool zeroForOne
 	) private {
-		uint256 leftover0 = token0.balanceOf(address(this)) - managerBalance0 - gelatoBalance0;
-		uint256 leftover1 = token1.balanceOf(address(this)) - managerBalance1 - gelatoBalance1;
+		uint256 leftover0 = token0.balanceOf(address(this)) - managerBalance0;
+		uint256 leftover1 = token1.balanceOf(address(this)) - managerBalance1;
 
 		(, , uint256 feesEarned0, uint256 feesEarned1) = _withdraw(
 			lowerTick,
 			upperTick,
 			liquidity
 		);
-		_applyFees(feesEarned0, feesEarned1);
-		(feesEarned0, feesEarned1) = _subtractAdminFees(feesEarned0, feesEarned1);
-		emit FeesEarned(feesEarned0, feesEarned1);
+
+		(feesEarned0, feesEarned1) = _applyFees(feesEarned0, feesEarned1);
+
 		feesEarned0 += leftover0;
 		feesEarned1 += leftover1;
-
-		if (paymentToken == address(token0)) {
-			require((feesEarned0 * gelatoRebalanceBPS) / 10000 >= feeAmount, "high fee");
-			leftover0 =
-				token0.balanceOf(address(this)) -
-				managerBalance0 -
-				gelatoBalance0 -
-				feeAmount;
-			leftover1 = token1.balanceOf(address(this)) - managerBalance1 - gelatoBalance1;
-		} else if (paymentToken == address(token1)) {
-			require((feesEarned1 * gelatoRebalanceBPS) / 10000 >= feeAmount, "high fee");
-			leftover0 = token0.balanceOf(address(this)) - managerBalance0 - gelatoBalance0;
-			leftover1 =
-				token1.balanceOf(address(this)) -
-				managerBalance1 -
-				gelatoBalance1 -
-				feeAmount;
-		} else {
-			revert("wrong token");
-		}
 
 		_deposit(
 			lowerTick,
@@ -649,6 +559,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		bool zeroForOne
 	) private {
 		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
+
 		// First, deposit as much as we can
 		uint128 baseLiquidity = LiquidityAmounts.getLiquidityForAmounts(
 			sqrtRatioX96,
@@ -657,6 +568,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			amount0,
 			amount1
 		);
+
 		if (baseLiquidity > 0) {
 			(uint256 amountDeposited0, uint256 amountDeposited1) = pool.mint(
 				address(this),
@@ -669,6 +581,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			amount0 -= amountDeposited0;
 			amount1 -= amountDeposited1;
 		}
+
 		int256 swapAmount = SafeCast.toInt256(
 			((zeroForOne ? amount0 : amount1) * swapAmountBPS) / 10000
 		);
@@ -701,6 +614,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			swapThresholdPrice,
 			""
 		);
+
 		finalAmount0 = uint256(SafeCast.toInt256(amount0) - amount0Delta);
 		finalAmount1 = uint256(SafeCast.toInt256(amount1) - amount1Delta);
 
@@ -713,6 +627,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			finalAmount0,
 			finalAmount1
 		);
+
 		if (liquidityAfterSwap > 0) {
 			pool.mint(address(this), lowerTick_, upperTick_, liquidityAfterSwap, "");
 		}
@@ -734,7 +649,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 	{
 		(uint256 amount0Current, uint256 amount1Current) = getUnderlyingBalances();
 
-		// compute proportional amount of tokens to mint
+		// Compute proportional amount of tokens to mint
 		if (amount0Current == 0 && amount1Current > 0) {
 			mintAmount = FullMath.mulDiv(amount1Max, totalSupply, amount1Current);
 		} else if (amount1Current == 0 && amount0Current > 0) {
@@ -742,7 +657,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		} else if (amount0Current == 0 && amount1Current == 0) {
 			revert("");
 		} else {
-			// only if both are non-zero
+			// Only if both are non-zero
 			uint256 amount0Mint = FullMath.mulDiv(amount0Max, totalSupply, amount0Current);
 			uint256 amount1Mint = FullMath.mulDiv(amount1Max, totalSupply, amount1Current);
 			require(amount0Mint > 0 && amount1Mint > 0, "mint 0");
@@ -750,7 +665,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			mintAmount = amount0Mint < amount1Mint ? amount0Mint : amount1Mint;
 		}
 
-		// compute amounts owed to contract
+		// Compute amounts owed to contract
 		amount0 = FullMath.mulDivRoundingUp(mintAmount, amount0Current, totalSupply);
 		amount1 = FullMath.mulDivRoundingUp(mintAmount, amount1Current, totalSupply);
 	}
@@ -776,7 +691,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		}
 
 		unchecked {
-			// calculate fee growth below
+			// Calculate fee growth below
 			uint256 feeGrowthBelow;
 			if (tick >= lowerTick) {
 				feeGrowthBelow = feeGrowthOutsideLower;
@@ -784,7 +699,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 				feeGrowthBelow = feeGrowthGlobal - feeGrowthOutsideLower;
 			}
 
-			// calculate fee growth above
+			// Calculate fee growth above
 			uint256 feeGrowthAbove;
 			if (tick < upperTick) {
 				feeGrowthAbove = feeGrowthOutsideUpper;
@@ -801,22 +716,20 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		}
 	}
 
-	function _applyFees(uint256 _fee0, uint256 _fee1) private {
-		gelatoBalance0 += (_fee0 * gelatoFeeBPS) / 10000;
-		gelatoBalance1 += (_fee1 * gelatoFeeBPS) / 10000;
-		managerBalance0 += (_fee0 * managerFeeBPS) / 10000;
-		managerBalance1 += (_fee1 * managerFeeBPS) / 10000;
-	}
-
-	function _subtractAdminFees(uint256 rawFee0, uint256 rawFee1)
+	function _applyFees(uint256 rawFee0, uint256 rawFee1)
 		private
-		view
 		returns (uint256 fee0, uint256 fee1)
 	{
-		uint256 deduct0 = (rawFee0 * (gelatoFeeBPS + managerFeeBPS)) / 10000;
-		uint256 deduct1 = (rawFee1 * (gelatoFeeBPS + managerFeeBPS)) / 10000;
-		fee0 = rawFee0 - deduct0;
-		fee1 = rawFee1 - deduct1;
+		uint256 managerFee0 = (rawFee0 * managerFeeBPS) / 10000;
+		uint256 managerFee1 = (rawFee1 * managerFeeBPS) / 10000;
+
+		managerBalance0 += managerFee0;
+		managerBalance1 += managerFee1;
+
+		fee0 = rawFee0 - managerFee0;
+		fee1 = rawFee1 - managerFee1;
+
+		emit FeesEarned(fee0, fee1);
 	}
 
 	function _checkSlippage(uint160 swapThresholdPrice, bool zeroForOne) private view {
@@ -826,7 +739,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 
 		(int56[] memory tickCumulatives, ) = pool.observe(secondsAgo);
 
-		require(tickCumulatives.length == 2, "array len");
+		require(tickCumulatives.length == 2, "array length");
 		uint160 avgSqrtRatioX96;
 		unchecked {
 			int24 avgTick = int24(

@@ -22,7 +22,7 @@ abstract contract OwnableUninitialized {
 	event OwnershipTransferred(address indexed previousManager, address indexed newManager);
 
 	/// @dev Initializes the contract setting the deployer as the initial manager.
-	/// CONSTRUCTOR EMPTY - USE INITIALIZIABLE INSTEAD
+	/// CONSTRUCTOR EMPTY - USE INITIALIZABLE INSTEAD
 	// solhint-disable-next-line no-empty-blocks
 	constructor() {}
 
