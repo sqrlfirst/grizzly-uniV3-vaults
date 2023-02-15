@@ -7,13 +7,19 @@ import { IUniswapV3SwapCallback } from "@uniswap/v3-core/contracts/interfaces/ca
 import { GUniPoolStorage } from "./abstract/GUniPoolStorage.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import { IUniswapV3Factory } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import { Multicall } from "./abstract/Multicall.sol";
 import { TickMath } from "./vendor/uniswap/TickMath.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { FullMath, LiquidityAmounts } from "./vendor/uniswap/LiquidityAmounts.sol";
 
-contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolStorage {
+contract GUniPool is
+	IUniswapV3MintCallback,
+	IUniswapV3SwapCallback,
+	Multicall,
+	GUniPoolStorage
+{
 	using SafeERC20 for IERC20;
 	using TickMath for int24;
 
