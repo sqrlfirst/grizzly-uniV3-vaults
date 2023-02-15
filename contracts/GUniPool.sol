@@ -179,6 +179,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 
 		uint256 totalSupply = totalSupply();
 
+		Ticks memory ticks = baseTicks;
 		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
 
 		if (totalSupply > 0) {
@@ -193,11 +194,10 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			require(mintAmount > MIN_INITIAL_SHARES, "min shares");
 
 			// If supply is 0 mintAmount == liquidity to deposit
-			(amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(
-				sqrtRatioX96,
-				lowerTick.getSqrtRatioAtTick(),
-				upperTick.getSqrtRatioAtTick(),
-				SafeCast.toUint128(mintAmount)
+			(amount0, amount1) = _amountsForLiquidity(
+				SafeCast.toUint128(mintAmount),
+				ticks,
+				sqrtRatioX96
 			);
 		}
 
@@ -210,15 +210,9 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		}
 
 		// Deposit as much new liquidity as possible
-		liquidityMinted = LiquidityAmounts.getLiquidityForAmounts(
-			sqrtRatioX96,
-			lowerTick.getSqrtRatioAtTick(),
-			upperTick.getSqrtRatioAtTick(),
-			amount0,
-			amount1
-		);
+		liquidityMinted = _liquidityForAmounts(ticks, sqrtRatioX96, amount0, amount1);
 
-		pool.mint(address(this), lowerTick, upperTick, liquidityMinted, "");
+		pool.mint(address(this), ticks.lowerTick, ticks.upperTick, liquidityMinted, "");
 
 		_mint(receiver, mintAmount);
 		emit Minted(receiver, mintAmount, amount0, amount1, liquidityMinted);
@@ -244,7 +238,9 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 
 		uint256 totalSupply = totalSupply();
 
-		(uint128 liquidity, , , , ) = pool.positions(_getPositionID());
+		Ticks memory ticks = baseTicks;
+
+		(uint128 liquidity, , , , ) = pool.positions(_getPositionID(ticks));
 
 		_burn(msg.sender, burnAmount);
 
@@ -253,8 +249,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		liquidityBurned = SafeCast.toUint128(liquidityBurned_);
 
 		(uint256 burn0, uint256 burn1, uint256 fee0, uint256 fee1) = _withdraw(
-			lowerTick,
-			upperTick,
+			ticks,
 			liquidityBurned
 		);
 
@@ -312,35 +307,30 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		uint128 liquidity;
 		uint128 newLiquidity;
 
+		Ticks memory ticks = baseTicks;
+		Ticks memory newTicks = Ticks(newLowerTick, newUpperTick);
+
 		if (totalSupply() > 0) {
-			(liquidity, , , , ) = pool.positions(_getPositionID());
+			(liquidity, , , , ) = pool.positions(_getPositionID(ticks));
 			if (liquidity > 0) {
-				(, , uint256 fee0, uint256 fee1) = _withdraw(lowerTick, upperTick, liquidity);
+				(, , uint256 fee0, uint256 fee1) = _withdraw(ticks, liquidity);
 
 				(fee0, fee1) = _applyFees(fee0, fee1);
 			}
 
-			lowerTick = newLowerTick;
-			upperTick = newUpperTick;
+			// Update storage ticks
+			baseTicks = newTicks;
 
 			uint256 reinvest0 = token0.balanceOf(address(this)) - managerBalance0;
 			uint256 reinvest1 = token1.balanceOf(address(this)) - managerBalance1;
 
-			_deposit(
-				newLowerTick,
-				newUpperTick,
-				reinvest0,
-				reinvest1,
-				swapThresholdPrice,
-				swapAmountBPS,
-				zeroForOne
-			);
+			_deposit(newTicks, reinvest0, reinvest1, swapThresholdPrice, swapAmountBPS, zeroForOne);
 
-			(newLiquidity, , , , ) = pool.positions(_getPositionID());
+			(newLiquidity, , , , ) = pool.positions(_getPositionID(newTicks));
 			require(newLiquidity > 0, "new position 0");
 		} else {
-			lowerTick = newLowerTick;
-			upperTick = newUpperTick;
+			// Update storage ticks
+			baseTicks = newTicks;
 		}
 
 		emit Rebalance(newLowerTick, newUpperTick, liquidity, newLiquidity);
@@ -359,14 +349,19 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			_checkSlippage(swapThresholdPrice, zeroForOne);
 		}
 
-		(uint128 liquidity, , , , ) = pool.positions(_getPositionID());
+		Ticks memory ticks = baseTicks;
 
-		_rebalance(liquidity, swapThresholdPrice, swapAmountBPS, zeroForOne);
+		// In rebalance ticks remain the same
+		bytes32 key = _getPositionID(ticks);
 
-		(uint128 newLiquidity, , , , ) = pool.positions(_getPositionID());
+		(uint128 liquidity, , , , ) = pool.positions(key);
+
+		_rebalance(liquidity, swapThresholdPrice, swapAmountBPS, zeroForOne, ticks);
+
+		(uint128 newLiquidity, , , , ) = pool.positions(key);
 		require(newLiquidity > liquidity, "liquidity must increase");
 
-		emit Rebalance(lowerTick, upperTick, liquidity, newLiquidity);
+		emit Rebalance(ticks.lowerTick, ticks.upperTick, liquidity, newLiquidity);
 	}
 
 	/// @notice withdraw manager fees accrued, only authorized executors can call.
@@ -412,21 +407,13 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 				amount1Max
 			);
 		} else {
+			Ticks memory ticks = baseTicks;
 			(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
-			uint128 newLiquidity = LiquidityAmounts.getLiquidityForAmounts(
-				sqrtRatioX96,
-				lowerTick.getSqrtRatioAtTick(),
-				upperTick.getSqrtRatioAtTick(),
-				amount0Max,
-				amount1Max
-			);
+
+			uint128 newLiquidity = _liquidityForAmounts(ticks, sqrtRatioX96, amount0Max, amount1Max);
+
 			mintAmount = uint256(newLiquidity);
-			(amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(
-				sqrtRatioX96,
-				lowerTick.getSqrtRatioAtTick(),
-				upperTick.getSqrtRatioAtTick(),
-				newLiquidity
-			);
+			(amount0, amount1) = _amountsForLiquidity(newLiquidity, ticks, sqrtRatioX96);
 		}
 	}
 
@@ -459,21 +446,18 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		view
 		returns (uint256 amount0Current, uint256 amount1Current)
 	{
+		Ticks memory ticks = baseTicks;
+
 		(
 			uint128 liquidity,
 			uint256 feeGrowthInside0Last,
 			uint256 feeGrowthInside1Last,
 			uint128 tokensOwed0,
 			uint128 tokensOwed1
-		) = pool.positions(_getPositionID());
+		) = pool.positions(_getPositionID(ticks));
 
 		// Compute current holdings from liquidity
-		(amount0Current, amount1Current) = LiquidityAmounts.getAmountsForLiquidity(
-			sqrtRatioX96,
-			lowerTick.getSqrtRatioAtTick(),
-			upperTick.getSqrtRatioAtTick(),
-			liquidity
-		);
+		(amount0Current, amount1Current) = _amountsForLiquidity(liquidity, ticks, sqrtRatioX96);
 
 		// Compute current fees earned
 		uint256 fee0 = _computeFeesEarned(true, feeGrowthInside0Last, tick, liquidity) +
@@ -489,6 +473,38 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		amount1Current += fee1 + token1.balanceOf(address(this)) - managerBalance1;
 	}
 
+	/// @notice Computes the token0 and token1 value for a given amount of liquidity
+	function _amountsForLiquidity(
+		uint128 _liquidity,
+		Ticks memory _ticks,
+		uint160 _sqrtRatioX96
+	) internal view returns (uint256, uint256) {
+		return
+			LiquidityAmounts.getAmountsForLiquidity(
+				_sqrtRatioX96,
+				_ticks.lowerTick.getSqrtRatioAtTick(),
+				_ticks.upperTick.getSqrtRatioAtTick(),
+				_liquidity
+			);
+	}
+
+	/// @notice Gets the liquidity for the available amounts of token0 and token1
+	function _liquidityForAmounts(
+		Ticks memory _ticks,
+		uint160 _sqrtRatioX96,
+		uint256 _amount0,
+		uint256 _amount1
+	) internal view returns (uint128) {
+		return
+			LiquidityAmounts.getLiquidityForAmounts(
+				_sqrtRatioX96,
+				_ticks.lowerTick.getSqrtRatioAtTick(),
+				_ticks.upperTick.getSqrtRatioAtTick(),
+				_amount0,
+				_amount1
+			);
+	}
+
 	// Private functions
 
 	// solhint-disable-next-line function-max-lines
@@ -496,39 +512,24 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		uint128 liquidity,
 		uint160 swapThresholdPrice,
 		uint256 swapAmountBPS,
-		bool zeroForOne
+		bool zeroForOne,
+		Ticks memory ticks
 	) private {
 		uint256 leftover0 = token0.balanceOf(address(this)) - managerBalance0;
 		uint256 leftover1 = token1.balanceOf(address(this)) - managerBalance1;
 
-		(, , uint256 feesEarned0, uint256 feesEarned1) = _withdraw(
-			lowerTick,
-			upperTick,
-			liquidity
-		);
+		(, , uint256 feesEarned0, uint256 feesEarned1) = _withdraw(ticks, liquidity);
 
 		(feesEarned0, feesEarned1) = _applyFees(feesEarned0, feesEarned1);
 
 		feesEarned0 += leftover0;
 		feesEarned1 += leftover1;
 
-		_deposit(
-			lowerTick,
-			upperTick,
-			leftover0,
-			leftover1,
-			swapThresholdPrice,
-			swapAmountBPS,
-			zeroForOne
-		);
+		_deposit(ticks, leftover0, leftover1, swapThresholdPrice, swapAmountBPS, zeroForOne);
 	}
 
 	// solhint-disable-next-line function-max-lines
-	function _withdraw(
-		int24 lowerTick_,
-		int24 upperTick_,
-		uint128 liquidity
-	)
+	function _withdraw(Ticks memory _ticks, uint128 liquidity)
 		private
 		returns (
 			uint256 burn0,
@@ -540,9 +541,15 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		uint256 preBalance0 = token0.balanceOf(address(this));
 		uint256 preBalance1 = token1.balanceOf(address(this));
 
-		(burn0, burn1) = pool.burn(lowerTick_, upperTick_, liquidity);
+		(burn0, burn1) = pool.burn(_ticks.lowerTick, _ticks.upperTick, liquidity);
 
-		pool.collect(address(this), lowerTick_, upperTick_, type(uint128).max, type(uint128).max);
+		pool.collect(
+			address(this),
+			_ticks.lowerTick,
+			_ticks.upperTick,
+			type(uint128).max,
+			type(uint128).max
+		);
 
 		fee0 = token0.balanceOf(address(this)) - preBalance0 - burn0;
 		fee1 = token1.balanceOf(address(this)) - preBalance1 - burn1;
@@ -550,8 +557,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 
 	// solhint-disable-next-line function-max-lines
 	function _deposit(
-		int24 lowerTick_,
-		int24 upperTick_,
+		Ticks memory ticks,
 		uint256 amount0,
 		uint256 amount1,
 		uint160 swapThresholdPrice,
@@ -561,19 +567,13 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
 
 		// First, deposit as much as we can
-		uint128 baseLiquidity = LiquidityAmounts.getLiquidityForAmounts(
-			sqrtRatioX96,
-			lowerTick_.getSqrtRatioAtTick(),
-			upperTick_.getSqrtRatioAtTick(),
-			amount0,
-			amount1
-		);
+		uint128 baseLiquidity = _liquidityForAmounts(ticks, sqrtRatioX96, amount0, amount1);
 
 		if (baseLiquidity > 0) {
 			(uint256 amountDeposited0, uint256 amountDeposited1) = pool.mint(
 				address(this),
-				lowerTick_,
-				upperTick_,
+				ticks.lowerTick,
+				ticks.upperTick,
 				baseLiquidity,
 				""
 			);
@@ -586,21 +586,12 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 			((zeroForOne ? amount0 : amount1) * swapAmountBPS) / 10000
 		);
 		if (swapAmount > 0) {
-			_swapAndDeposit(
-				lowerTick_,
-				upperTick_,
-				amount0,
-				amount1,
-				swapAmount,
-				swapThresholdPrice,
-				zeroForOne
-			);
+			_swapAndDeposit(ticks, amount0, amount1, swapAmount, swapThresholdPrice, zeroForOne);
 		}
 	}
 
 	function _swapAndDeposit(
-		int24 lowerTick_,
-		int24 upperTick_,
+		Ticks memory ticks,
 		uint256 amount0,
 		uint256 amount1,
 		int256 swapAmount,
@@ -620,16 +611,16 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 
 		// Add liquidity a second time
 		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
-		uint128 liquidityAfterSwap = LiquidityAmounts.getLiquidityForAmounts(
+
+		uint128 liquidityAfterSwap = _liquidityForAmounts(
+			ticks,
 			sqrtRatioX96,
-			lowerTick_.getSqrtRatioAtTick(),
-			upperTick_.getSqrtRatioAtTick(),
 			finalAmount0,
 			finalAmount1
 		);
 
 		if (liquidityAfterSwap > 0) {
-			pool.mint(address(this), lowerTick_, upperTick_, liquidityAfterSwap, "");
+			pool.mint(address(this), ticks.lowerTick, ticks.upperTick, liquidityAfterSwap, "");
 		}
 	}
 
@@ -680,20 +671,23 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 		uint256 feeGrowthOutsideLower;
 		uint256 feeGrowthOutsideUpper;
 		uint256 feeGrowthGlobal;
+
+		Ticks memory ticks = baseTicks;
+
 		if (isZero) {
 			feeGrowthGlobal = pool.feeGrowthGlobal0X128();
-			(, , feeGrowthOutsideLower, , , , , ) = pool.ticks(lowerTick);
-			(, , feeGrowthOutsideUpper, , , , , ) = pool.ticks(upperTick);
+			(, , feeGrowthOutsideLower, , , , , ) = pool.ticks(ticks.lowerTick);
+			(, , feeGrowthOutsideUpper, , , , , ) = pool.ticks(ticks.upperTick);
 		} else {
 			feeGrowthGlobal = pool.feeGrowthGlobal1X128();
-			(, , , feeGrowthOutsideLower, , , , ) = pool.ticks(lowerTick);
-			(, , , feeGrowthOutsideUpper, , , , ) = pool.ticks(upperTick);
+			(, , , feeGrowthOutsideLower, , , , ) = pool.ticks(ticks.lowerTick);
+			(, , , feeGrowthOutsideUpper, , , , ) = pool.ticks(ticks.upperTick);
 		}
 
 		unchecked {
 			// Calculate fee growth below
 			uint256 feeGrowthBelow;
-			if (tick >= lowerTick) {
+			if (tick >= ticks.lowerTick) {
 				feeGrowthBelow = feeGrowthOutsideLower;
 			} else {
 				feeGrowthBelow = feeGrowthGlobal - feeGrowthOutsideLower;
@@ -701,7 +695,7 @@ contract GUniPool is IUniswapV3MintCallback, IUniswapV3SwapCallback, GUniPoolSto
 
 			// Calculate fee growth above
 			uint256 feeGrowthAbove;
-			if (tick < upperTick) {
+			if (tick < ticks.upperTick) {
 				feeGrowthAbove = feeGrowthOutsideUpper;
 			} else {
 				feeGrowthAbove = feeGrowthGlobal - feeGrowthOutsideUpper;

@@ -23,9 +23,13 @@ abstract contract GUniPoolStorage is
 	// solhint-disable-next-line const-name-snakecase
 	uint16 public constant gelatoFeeBPS = 250;
 
+	struct Ticks {
+		int24 lowerTick;
+		int24 upperTick;
+	}
+
 	// XXXXXXXX DO NOT MODIFY ORDERING XXXXXXXX
-	int24 public lowerTick;
-	int24 public upperTick;
+	Ticks public baseTicks;
 
 	uint16 public gelatoRebalanceBPS;
 	uint16 public gelatoWithdrawBPS;
@@ -101,8 +105,8 @@ abstract contract GUniPoolStorage is
 		gelatoWithdrawBPS = 100; // default: only auto withdraw if tx fee is lt 1% withdrawn
 		gelatoRebalanceBPS = 200; // default: only rebalance if tx fee is lt 2% reinvested
 		managerTreasury = _manager_; // default: treasury is admin
-		lowerTick = _lowerTick;
-		upperTick = _upperTick;
+		baseTicks.lowerTick = _lowerTick;
+		baseTicks.upperTick = _upperTick;
 		_manager = _manager_;
 
 		// e.g. "Gelato Uniswap V3 USDC/DAI LP" and "G-UNI"
@@ -162,11 +166,11 @@ abstract contract GUniPoolStorage is
 	}
 
 	function getPositionID() external view returns (bytes32 positionID) {
-		return _getPositionID();
+		return _getPositionID(baseTicks);
 	}
 
-	function _getPositionID() internal view returns (bytes32 positionID) {
-		return keccak256(abi.encodePacked(address(this), lowerTick, upperTick));
+	function _getPositionID(Ticks memory _ticks) internal view returns (bytes32 positionID) {
+		return keccak256(abi.encodePacked(address(this), _ticks.lowerTick, _ticks.upperTick));
 	}
 
 	function setKeeperAddress(address _keeperAddress) external onlyManager {
