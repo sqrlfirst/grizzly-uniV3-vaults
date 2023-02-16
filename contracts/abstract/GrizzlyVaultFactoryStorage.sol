@@ -6,7 +6,7 @@ import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/I
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 // solhint-disable-next-line max-states-count
-contract GUniFactoryStorage is
+contract GrizzlyVaultFactoryStorage is
 	OwnableUninitialized, /* XXXX DONT MODIFY ORDERING XXXX */
 	Initializable
 	// APPEND ADDITIONAL BASE WITH STATE VARS BELOW:
@@ -20,12 +20,12 @@ contract GUniFactoryStorage is
 	address public gelatoDeployer;
 	EnumerableSet.AddressSet internal _deployers;
 	mapping(address => EnumerableSet.AddressSet) internal _pools;
-	// APPPEND ADDITIONAL STATE VARS BELOW:
+	// APPEND ADDITIONAL STATE VARS BELOW:
 	// XXXXXXXX DO NOT MODIFY ORDERING XXXXXXXX
 
 	event UpdatePoolImplementation(address previousImplementation, address newImplementation);
 
-	event UpdateGelatoDeployer(address previosGelatoDeployer, address newGelatoDeployer);
+	event UpdateGelatoDeployer(address previousGelatoDeployer, address newGelatoDeployer);
 
 	constructor(address _uniswapV3Factory) {
 		factory = _uniswapV3Factory;

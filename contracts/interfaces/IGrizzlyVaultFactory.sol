@@ -1,7 +1,7 @@
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.4;
 
-interface IGUniFactory {
+interface IGrizzlyVaultFactory {
 	event PoolCreated(address indexed uniPool, address indexed manager, address indexed pool);
 
 	function createPool(

@@ -3,7 +3,7 @@ pragma solidity 0.8.4;
 
 abstract contract Proxied {
 	/// @notice to be used by initialisation / postUpgrade function so that only the proxy's admin can execute them
-	/// It also allows these functions to be called inside a contructor
+	/// It also allows these functions to be called inside a constructor
 	/// even if the contract is meant to be used without proxy
 	modifier proxied() {
 		address proxyAdminAddress = _proxyAdmin();

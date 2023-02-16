@@ -4,7 +4,7 @@ pragma solidity 0.8.4;
 
 import { IUniswapV3MintCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import { IUniswapV3SwapCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
-import { GUniPoolStorage } from "./abstract/GUniPoolStorage.sol";
+import { GrizzlyVaultStorage } from "./abstract/GrizzlyVaultStorage.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import { IUniswapV3Factory } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import { Multicall } from "./abstract/Multicall.sol";
@@ -14,11 +14,11 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { FullMath, LiquidityAmounts } from "./vendor/uniswap/LiquidityAmounts.sol";
 
-contract GUniPool is
+contract GrizzlyVault is
 	IUniswapV3MintCallback,
 	IUniswapV3SwapCallback,
 	Multicall,
-	GUniPoolStorage
+	GrizzlyVaultStorage
 {
 	using SafeERC20 for IERC20;
 	using TickMath for int24;
@@ -48,7 +48,9 @@ contract GUniPool is
 
 	event FeesEarned(uint256 feesEarned0, uint256 feesEarned1);
 
-	/// @notice Uniswap V3 callback fn, called back on pool.mint
+	// --- UniV3 callback functions --- //
+
+	/// @notice Uniswap V3 callback function, called back on pool.mint
 	function uniswapV3MintCallback(
 		uint256 amount0Owed,
 		uint256 amount1Owed,
@@ -60,7 +62,7 @@ contract GUniPool is
 		if (amount1Owed > 0) token1.safeTransfer(msg.sender, amount1Owed);
 	}
 
-	/// @notice Uniswap v3 callback fn, called back on pool.swap
+	/// @notice Uniswap v3 callback function, called back on pool.swap
 	function uniswapV3SwapCallback(
 		int256 amount0Delta,
 		int256 amount1Delta,
@@ -113,7 +115,7 @@ contract GUniPool is
 			newVault := create(0, clone_code, 0x37)
 		}
 
-		GUniPool(newVault).initialize(
+		GrizzlyVault(newVault).initialize(
 			name,
 			"GV",
 			uniPool,
@@ -162,15 +164,15 @@ contract GUniPool is
 		return string(abi.encodePacked(a, b, c, d, e));
 	}
 
-	// User functions => Should be called via a Router
+	// --- User functions --- //
 
-	/// @notice mint fungible G-UNI tokens, fractional shares of a Uniswap V3 position
+	/// @notice mint fungible Grizzly Vault tokens, fractional shares of a Uniswap V3 position
 	/// @dev to compute the amount of tokens necessary to mint `mintAmount` see getMintAmounts
-	/// @param mintAmount The number of G-UNI tokens to mint
+	/// @param mintAmount The number of Grizzly Vault tokens to mint
 	/// @param receiver The account to receive the minted tokens
-	/// @return amount0 amount of token0 transferred from msg.sender to mint `mintAmount`
-	/// @return amount1 amount of token1 transferred from msg.sender to mint `mintAmount`
-	/// @return liquidityMinted amount of liquidity added to the underlying Uniswap V3 position
+	/// @return amount0 Amount of token0 transferred from msg.sender to mint `mintAmount`
+	/// @return amount1 Amount of token1 transferred from msg.sender to mint `mintAmount`
+	/// @return liquidityMinted Amount of liquidity added to the underlying Uniswap V3 position
 	// solhint-disable-next-line function-max-lines, code-complexity
 	function mint(uint256 mintAmount, address receiver)
 		external
@@ -232,16 +234,16 @@ contract GUniPool is
 		int256 amount1Delta;
 	}
 
-	/// @notice burn G-UNI tokens (fractional shares of a Uniswap V3 position) and receive tokens
-	/// @dev onlyToken0 and onlyToken1 can not be both true, but can be both false.
-	/// In the case of both false, the user receives the proportional token0 and token1 amounts.
-	/// @param burnAmount The number of G-UNI tokens to burn
+	/// @notice burn Grizzly Vault tokens (fractional shares of a UniV3 position) and receive tokens
+	/// @dev onlyToken0 and onlyToken1 can not be both true, but can be both false
+	/// In the case of both false, the user receives the proportional token0 and token1 amounts
+	/// @param burnAmount The number of Grizzly Vault tokens to burn
 	/// @param onlyToken0 If true the user zaps out with only token0
 	/// @param onlyToken1  If true the user zaps out with only token1
 	/// @param receiver The account to receive the underlying amounts of token0 and token1
-	/// @return amount0 amount of token0 transferred to receiver for burning `burnAmount`
-	/// @return amount1 amount of token1 transferred to receiver for burning `burnAmount`
-	/// @return liquidityBurned amount of liquidity removed from the underlying Uniswap V3 position
+	/// @return amount0 Amount of token0 transferred to receiver for burning `burnAmount`
+	/// @return amount1 Amount of token1 transferred to receiver for burning `burnAmount`
+	/// @return liquidityBurned Amount of liquidity removed from the underlying Uniswap V3 position
 	// solhint-disable-next-line function-max-lines
 	function burn(
 		uint256 burnAmount,
@@ -312,13 +314,13 @@ contract GUniPool is
 		emit Burned(receiver, burnAmount, amount0, amount1, liquidityBurned);
 	}
 
-	// Manager Functions => Called by Pool Manager
+	// --- External manager functions --- // Called by Pool Manager
 
 	/// @notice Change the range of underlying UniswapV3 position, only manager can call
 	/// @dev When changing the range the inventory of token0 and token1 may be rebalanced
 	/// with a swap to deposit as much liquidity as possible into the new position.
-	/// Swap a proportion of this leftover to deposit more liquidity into the position, since
-	/// any leftover will be unused and sit idle until the next rebalance.
+	/// Swap a proportion of this leftover to deposit more liquidity into the position,
+	/// since any leftover will be unused and sit idle until the next rebalance
 	/// @param newLowerTick The new lower bound of the position's range
 	/// @param newUpperTick The new upper bound of the position's range
 	/// @param minLiquidity Minimum liquidity of the new position in order to not revert
@@ -369,11 +371,11 @@ contract GUniPool is
 		emit Rebalance(newLowerTick, newUpperTick, liquidity, newLiquidity);
 	}
 
-	// Authorized functions => Can be automated
+	// --- External authorized functions --- //  Can be automated
 
-	/// @notice Reinvest fees earned into underlying position, only authorized executors can call.
-	/// @dev As the ticks do not change, liquidity must increase, otherwise will revert.
-	/// Position bounds CANNOT be altered, only manager may via executiveRebalance.
+	/// @notice Reinvest fees earned into underlying position, only authorized executors can call
+	/// @dev As the ticks do not change, liquidity must increase, otherwise will revert
+	/// Position bounds CANNOT be altered, only manager may via executiveRebalance
 	function rebalance() external onlyAuthorized {
 		// First check pool health
 		_checkPriceSlippage();
@@ -393,8 +395,8 @@ contract GUniPool is
 		emit Rebalance(ticks.lowerTick, ticks.upperTick, liquidity, newLiquidity);
 	}
 
-	/// @notice Withdraw manager fees accrued, only authorized executors can call.
-	/// Target account to receive fees is managerTreasury, alterable by only manager.
+	/// @notice Withdraw manager fees accrued, only authorized executors can call
+	/// Target account to receive fees is managerTreasury, alterable by only manager
 	function withdrawManagerBalance() external onlyAuthorized {
 		uint256 amount0 = managerBalance0;
 		uint256 amount1 = managerBalance1;
@@ -411,14 +413,14 @@ contract GUniPool is
 		}
 	}
 
-	// View functions
+	// --- External view functions --- //
 
-	/// @notice compute maximum G-UNI tokens that can be minted from `amount0Max` and `amount1Max`
+	/// @notice Compute max Grizzly Vault tokens that can be minted from `amount0Max` & `amount1Max`
 	/// @param amount0Max The maximum amount of token0 to forward on mint
 	/// @param amount0Max The maximum amount of token1 to forward on mint
-	/// @return amount0 actual amount of token0 to forward when minting `mintAmount`
-	/// @return amount1 actual amount of token1 to forward when minting `mintAmount`
-	/// @return mintAmount maximum number of G-UNI tokens to mint
+	/// @return amount0 Actual amount of token0 to forward when minting `mintAmount`
+	/// @return amount1 Actual amount of token1 to forward when minting `mintAmount`
+	/// @return mintAmount Maximum number of Grizzly Vault tokens to mint
 	function getMintAmounts(uint256 amount0Max, uint256 amount1Max)
 		external
 		view
@@ -446,8 +448,19 @@ contract GUniPool is
 		}
 	}
 
-	/// @notice compute total underlying holdings of the G-UNI token supply
-	/// includes current liquidity invested in uniswap position, current fees earned
+	/// @notice Returns swapThresholdPrice according a desired slippage amount
+	function getSwapThresholdPrice(bool _zeroForOne, uint256 _slippageMax)
+		external
+		view
+		returns (uint160 swapThresholdPrice)
+	{
+		(uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
+		uint256 slippage = _zeroForOne ? (basisOne - _slippageMax) : (basisOne + _slippageMax);
+		return uint160(uint256((sqrtPriceX96 * slippage) / basisOne));
+	}
+
+	/// @notice Compute total underlying holdings of the Grizzly Vault token supply
+	/// Includes current liquidity invested in uniswap position, current fees earned
 	/// and any uninvested leftover (but does not include manager or gelato fees accrued)
 	/// @return amount0Current current total underlying balance of token0
 	/// @return amount1Current current total underlying balance of token1
@@ -469,7 +482,159 @@ contract GUniPool is
 		return _getUnderlyingBalances(sqrtRatioX96, tick);
 	}
 
-	// solhint-disable-next-line function-max-lines
+	// --- Internal core functions --- //
+
+	function _rebalance(uint128 liquidity, Ticks memory ticks) internal {
+		(, , uint256 feesEarned0, uint256 feesEarned1) = _withdraw(ticks, liquidity);
+
+		(feesEarned0, feesEarned1) = _applyFees(feesEarned0, feesEarned1);
+
+		uint256 leftover0 = token0.balanceOf(address(this)) - managerBalance0;
+		uint256 leftover1 = token1.balanceOf(address(this)) - managerBalance1;
+
+		(uint256 finalAmount0, uint256 finalAmount1) = _balanceAmounts(
+			ticks,
+			leftover0,
+			leftover1
+		);
+
+		_addLiquidity(ticks, finalAmount0, finalAmount1);
+	}
+
+	function _withdraw(Ticks memory _ticks, uint128 liquidity)
+		internal
+		returns (
+			uint256 burn0,
+			uint256 burn1,
+			uint256 fee0,
+			uint256 fee1
+		)
+	{
+		uint256 preBalance0 = token0.balanceOf(address(this));
+		uint256 preBalance1 = token1.balanceOf(address(this));
+
+		(burn0, burn1) = pool.burn(_ticks.lowerTick, _ticks.upperTick, liquidity);
+
+		pool.collect(
+			address(this),
+			_ticks.lowerTick,
+			_ticks.upperTick,
+			type(uint128).max,
+			type(uint128).max
+		);
+
+		fee0 = token0.balanceOf(address(this)) - preBalance0 - burn0;
+		fee1 = token1.balanceOf(address(this)) - preBalance1 - burn1;
+	}
+
+	function _balanceAmounts(
+		Ticks memory ticks,
+		uint256 amount0Desired,
+		uint256 amount1Desired
+	) internal returns (uint256 finalAmount0, uint256 finalAmount1) {
+		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
+
+		// Get max liquidity for amounts available
+		uint128 liquidity = _liquidityForAmounts(
+			ticks,
+			sqrtRatioX96,
+			amount0Desired,
+			amount1Desired
+		);
+		// Get correct amounts of each token for the liquidity we have
+		(uint256 amount0, uint256 amount1) = _amountsForLiquidity(liquidity, ticks, sqrtRatioX96);
+
+		// Determine the trade direction
+		bool _zeroForOne;
+		if (amount1Desired == 0) {
+			_zeroForOne = true;
+		} else {
+			_zeroForOne = _amountsDirection(amount0Desired, amount1Desired, amount0, amount1);
+		}
+
+		// Determine the amount to swap
+		uint256 _amountSpecified = _zeroForOne
+			? (amount0Desired - (((amount0 * (basisOne + uniPoolFee / 2)) / basisOne) / 2))
+			: (amount1Desired - (((amount1 * (basisOne + uniPoolFee / 2)) / basisOne) / 2));
+
+		if (_amountSpecified > 0) {
+			(int256 amount0Delta, int256 amount1Delta) = _swap(
+				_amountSpecified,
+				_zeroForOne,
+				slippageRebalanceMax
+			);
+			finalAmount0 = uint256(SafeCast.toInt256(amount0) - amount0Delta);
+			finalAmount1 = uint256(SafeCast.toInt256(amount1) - amount1Delta);
+		} else {
+			return (amount0, amount1);
+		}
+	}
+
+	function _addLiquidity(
+		Ticks memory ticks,
+		uint256 amount0,
+		uint256 amount1
+	) internal {
+		// As we have made a swap in the pool sqrtRatioX96 changes
+		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
+
+		uint128 liquidityAfterSwap = _liquidityForAmounts(ticks, sqrtRatioX96, amount0, amount1);
+
+		if (liquidityAfterSwap > 0) {
+			pool.mint(address(this), ticks.lowerTick, ticks.upperTick, liquidityAfterSwap, "");
+		}
+	}
+
+	/// @notice slippageMax variable as argument to differentiate between user and rebalance swaps
+	function _swap(
+		uint256 _amountIn,
+		bool _zeroForOne,
+		uint256 _slippageMax
+	) internal returns (int256, int256) {
+		(uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
+		uint256 slippage = _zeroForOne ? (basisOne - _slippageMax) : (basisOne + _slippageMax);
+		return
+			pool.swap(
+				address(this),
+				_zeroForOne, // Swap direction, true: token0 -> token1, false: token1 -> token0
+				int256(_amountIn),
+				uint160(uint256((sqrtPriceX96 * slippage) / basisOne)), // sqrtPriceLimitX96
+				abi.encode(0)
+			);
+	}
+
+	function _transferAmounts(
+		uint256 amount0,
+		uint256 amount1,
+		address receiver
+	) internal {
+		if (amount0 > 0) {
+			token0.safeTransfer(receiver, amount0);
+		}
+
+		if (amount1 > 0) {
+			token1.safeTransfer(receiver, amount1);
+		}
+	}
+
+	function _applyFees(uint256 rawFee0, uint256 rawFee1)
+		internal
+		returns (uint256 fee0, uint256 fee1)
+	{
+		uint256 managerFee0 = (rawFee0 * managerFeeBPS) / basisOne;
+		uint256 managerFee1 = (rawFee1 * managerFeeBPS) / basisOne;
+
+		managerBalance0 += managerFee0;
+		managerBalance1 += managerFee1;
+
+		fee0 = rawFee0 - managerFee0;
+		fee1 = rawFee1 - managerFee1;
+
+		emit FeesEarned(fee0, fee1);
+	}
+
+	// --- Internal view functions --- //
+
 	function _getUnderlyingBalances(uint160 sqrtRatioX96, int24 tick)
 		internal
 		view
@@ -534,162 +699,10 @@ contract GUniPool is
 			);
 	}
 
-	// Internal functions
-
-	// solhint-disable-next-line function-max-lines
-	function _rebalance(uint128 liquidity, Ticks memory ticks) internal {
-		(, , uint256 feesEarned0, uint256 feesEarned1) = _withdraw(ticks, liquidity);
-
-		(feesEarned0, feesEarned1) = _applyFees(feesEarned0, feesEarned1);
-
-		uint256 leftover0 = token0.balanceOf(address(this)) - managerBalance0;
-		uint256 leftover1 = token1.balanceOf(address(this)) - managerBalance1;
-
-		(uint256 finalAmount0, uint256 finalAmount1) = _balanceAmounts(
-			ticks,
-			leftover0,
-			leftover1
-		);
-
-		_addLiquidity(ticks, finalAmount0, finalAmount1);
-	}
-
-	// solhint-disable-next-line function-max-lines
-	function _withdraw(Ticks memory _ticks, uint128 liquidity)
-		internal
-		returns (
-			uint256 burn0,
-			uint256 burn1,
-			uint256 fee0,
-			uint256 fee1
-		)
-	{
-		uint256 preBalance0 = token0.balanceOf(address(this));
-		uint256 preBalance1 = token1.balanceOf(address(this));
-
-		(burn0, burn1) = pool.burn(_ticks.lowerTick, _ticks.upperTick, liquidity);
-
-		pool.collect(
-			address(this),
-			_ticks.lowerTick,
-			_ticks.upperTick,
-			type(uint128).max,
-			type(uint128).max
-		);
-
-		fee0 = token0.balanceOf(address(this)) - preBalance0 - burn0;
-		fee1 = token1.balanceOf(address(this)) - preBalance1 - burn1;
-	}
-
-	function _balanceAmounts(
-		Ticks memory ticks,
-		uint256 amount0Desired,
-		uint256 amount1Desired
-	) internal returns (uint256 finalAmount0, uint256 finalAmount1) {
-		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
-
-		// Get max liquidity for amounts available
-		uint128 liquidity = _liquidityForAmounts(
-			ticks,
-			sqrtRatioX96,
-			amount0Desired,
-			amount1Desired
-		);
-
-		// Get correct amounts of each token for the liquidity we have
-		(uint256 amount0, uint256 amount1) = _amountsForLiquidity(liquidity, ticks, sqrtRatioX96);
-
-		// Determine the trade direction
-		bool _zeroForOne;
-		if (amount1Desired == 0) {
-			_zeroForOne = true;
-		} else {
-			_zeroForOne = _amountsDirection(amount0Desired, amount1Desired, amount0, amount1);
-		}
-
-		// Determine the amount to swap
-		uint256 _amountSpecified = _zeroForOne
-			? (amount0Desired - (((amount0 * (basisOne + uniPoolFee / 2)) / basisOne) / 2))
-			: (amount1Desired - (((amount1 * (basisOne + uniPoolFee / 2)) / basisOne) / 2));
-
-		if (_amountSpecified > 0) {
-			(int256 amount0Delta, int256 amount1Delta) = _swap(
-				_amountSpecified,
-				_zeroForOne,
-				slippageRebalanceMax
-			);
-			finalAmount0 = uint256(SafeCast.toInt256(amount0) - amount0Delta);
-			finalAmount1 = uint256(SafeCast.toInt256(amount1) - amount1Delta);
-		} else {
-			return (amount0, amount1);
-		}
-	}
-
-	/// @dev Needed in case token0 and token1 have different decimals
-	function _amountsDirection(
-		uint256 amount0Desired,
-		uint256 amount1Desired,
-		uint256 amount0,
-		uint256 amount1
-	) internal pure returns (bool zeroGreaterOne) {
-		zeroGreaterOne = (amount0Desired - amount0) * amount1Desired >
-			(amount1Desired - amount1) * amount0Desired
-			? true
-			: false;
-	}
-
-	function _addLiquidity(
-		Ticks memory ticks,
-		uint256 amount0,
-		uint256 amount1
-	) internal {
-		// As we have made a swap in the pool sqrtRatioX96 changes
-		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
-
-		uint128 liquidityAfterSwap = _liquidityForAmounts(ticks, sqrtRatioX96, amount0, amount1);
-
-		if (liquidityAfterSwap > 0) {
-			pool.mint(address(this), ticks.lowerTick, ticks.upperTick, liquidityAfterSwap, "");
-		}
-	}
-
-	/// @notice There is a global slippage variable for swapping amounts controlled by manager
-	function _swap(
-		uint256 _amountIn,
-		bool _zeroForOne,
-		uint256 _slippageMax
-	) internal returns (int256, int256) {
-		(uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
-		uint256 slippage = _zeroForOne ? (basisOne - _slippageMax) : (basisOne + _slippageMax);
-		return
-			pool.swap(
-				address(this),
-				_zeroForOne, // Swap direction, true: token0 -> token1, false: token1 -> token0
-				int256(_amountIn),
-				uint160(uint256((sqrtPriceX96 * slippage) / basisOne)), // sqrtPriceLimitX96
-				abi.encode(0)
-			);
-	}
-
-	function _transferAmounts(
-		uint256 amount0,
-		uint256 amount1,
-		address receiver
-	) internal {
-		if (amount0 > 0) {
-			token0.safeTransfer(receiver, amount0);
-		}
-
-		if (amount1 > 0) {
-			token1.safeTransfer(receiver, amount1);
-		}
-	}
-
-	function _validateValues(bool onlyToken0, bool onlyToken1) internal {
+	function _validateValues(bool onlyToken0, bool onlyToken1) internal view {
 		if (onlyToken0 && onlyToken1) revert("invalid inputs");
 	}
 
-	// solhint-disable-next-line function-max-lines, code-complexity
 	function _computeMintAmounts(
 		uint256 totalSupply,
 		uint256 amount0Max,
@@ -775,20 +788,17 @@ contract GUniPool is
 		}
 	}
 
-	function _applyFees(uint256 rawFee0, uint256 rawFee1)
-		internal
-		returns (uint256 fee0, uint256 fee1)
-	{
-		uint256 managerFee0 = (rawFee0 * managerFeeBPS) / basisOne;
-		uint256 managerFee1 = (rawFee1 * managerFeeBPS) / basisOne;
-
-		managerBalance0 += managerFee0;
-		managerBalance1 += managerFee1;
-
-		fee0 = rawFee0 - managerFee0;
-		fee1 = rawFee1 - managerFee1;
-
-		emit FeesEarned(fee0, fee1);
+	/// @dev Needed in case token0 and token1 have different decimals
+	function _amountsDirection(
+		uint256 amount0Desired,
+		uint256 amount1Desired,
+		uint256 amount0,
+		uint256 amount1
+	) internal pure returns (bool zeroGreaterOne) {
+		zeroGreaterOne = (amount0Desired - amount0) * amount1Desired >
+			(amount1Desired - amount1) * amount0Desired
+			? true
+			: false;
 	}
 
 	function _checkPriceSlippage() internal view {
@@ -816,16 +826,5 @@ contract GUniPool is
 		uint160 maxSlippage = (avgSqrtRatioX96 * oracleSlippageBPS) / 10000;
 
 		require(diff < maxSlippage, "high slippage");
-	}
-
-	/// @notice Returns swapThresholdPrice according a desired slippage amount
-	function getSwapThresholdPrice(bool _zeroForOne, uint256 _slippageMax)
-		external
-		view
-		returns (uint160 swapThresholdPrice)
-	{
-		(uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
-		uint256 slippage = _zeroForOne ? (basisOne - _slippageMax) : (basisOne + _slippageMax);
-		return uint160(uint256((sqrtPriceX96 * slippage) / basisOne));
 	}
 }

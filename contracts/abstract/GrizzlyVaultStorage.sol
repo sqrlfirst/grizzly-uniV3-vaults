@@ -11,7 +11,7 @@ import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC2
 /// @dev Add all inherited contracts with state vars here: APPEND ONLY
 /// @dev ERC20Upgradable Includes Initialize
 // solhint-disable-next-line max-states-count
-abstract contract GUniPoolStorage is
+abstract contract GrizzlyVaultStorage is
 	ERC20Upgradeable, /* XXXX DONT MODIFY ORDERING XXXX */
 	ReentrancyGuardUpgradeable,
 	OwnableUninitialized

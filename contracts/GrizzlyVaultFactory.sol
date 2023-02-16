@@ -3,18 +3,19 @@ pragma solidity 0.8.4;
 
 import { IUniswapV3Factory } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import { IUniswapV3TickSpacing } from "./interfaces/IUniswapV3TickSpacing.sol";
-import { IGUniFactory } from "./interfaces/IGUniFactory.sol";
-import { IGUniPoolStorage } from "./interfaces/IGUniPoolStorage.sol";
-import { GUniFactoryStorage } from "./abstract/GUniFactoryStorage.sol";
+import { IGrizzlyVaultFactory } from "./interfaces/IGrizzlyVaultFactory.sol";
+import { IGrizzlyVaultStorage } from "./interfaces/IGrizzlyVaultStorage.sol";
+import { GrizzlyVaultFactoryStorage } from "./abstract/GrizzlyVaultFactoryStorage.sol";
 import { EIP173Proxy } from "./vendor/proxy/EIP173Proxy.sol";
 import { IEIP173Proxy } from "./interfaces/IEIP173Proxy.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-contract GUniFactory is GUniFactoryStorage, IGUniFactory {
+contract GrizzlyVaultFactory is GrizzlyVaultFactoryStorage, IGrizzlyVaultFactory {
 	using EnumerableSet for EnumerableSet.AddressSet;
 
-	constructor(address _uniswapV3Factory) GUniFactoryStorage(_uniswapV3Factory) {} // solhint-disable-line no-empty-blocks
+	// solhint-disable-next-line no-empty-blocks
+	constructor(address _uniswapV3Factory) GrizzlyVaultFactoryStorage(_uniswapV3Factory) {}
 
 	/// @notice createManagedPool creates a new instance of a G-UNI token on a specified
 	/// UniswapV3Pool. The msg.sender is the initial manager of the pool and will
@@ -78,7 +79,7 @@ contract GUniFactory is GUniFactoryStorage, IGUniFactory {
 		require(uniPool != address(0), "uniswap pool does not exist");
 		require(_validateTickSpacing(uniPool, lowerTick, upperTick), "tickSpacing mismatch");
 
-		IGUniPoolStorage(pool).initialize(
+		IGrizzlyVaultStorage(pool).initialize(
 			name,
 			"G-UNI",
 			uniPool,
