@@ -33,7 +33,7 @@ abstract contract GUniPoolStorage is
 
 	uint16 public gelatoRebalanceBPS;
 	uint16 public gelatoWithdrawBPS;
-	uint16 public gelatoSlippageBPS;
+	uint16 public oracleSlippageBPS;
 	uint32 public gelatoSlippageInterval;
 
 	uint16 public managerFeeBPS;
@@ -47,6 +47,10 @@ abstract contract GUniPoolStorage is
 	IERC20 public token1;
 
 	uint256 internal constant MIN_INITIAL_SHARES = 1e9;
+	uint256 internal constant basisOne = 10000;
+
+	// In bps, how much slippage we allow between swaps -> 50 = 0.5% slippage
+	uint256 public slippageMax = 100;
 
 	bool internal isOriginal = true; // check for cloning
 
@@ -62,7 +66,7 @@ abstract contract GUniPoolStorage is
 	event UpdateGelatoParams(
 		uint16 gelatoRebalanceBPS,
 		uint16 gelatoWithdrawBPS,
-		uint16 gelatoSlippageBPS,
+		uint16 oracleSlippageBPS,
 		uint32 gelatoSlippageInterval
 	);
 
@@ -101,7 +105,7 @@ abstract contract GUniPoolStorage is
 
 		// these variables can be updated by the manager
 		gelatoSlippageInterval = 5 minutes; // default: last five minutes;
-		gelatoSlippageBPS = 500; // default: 5% slippage
+		oracleSlippageBPS = 500; // default: 5% slippage
 		gelatoWithdrawBPS = 100; // default: only auto withdraw if tx fee is lt 1% withdrawn
 		gelatoRebalanceBPS = 200; // default: only rebalance if tx fee is lt 2% reinvested
 		managerTreasury = _manager_; // default: treasury is admin
@@ -141,7 +145,7 @@ abstract contract GUniPoolStorage is
 		);
 		if (newRebalanceBPS != 0) gelatoRebalanceBPS = newRebalanceBPS;
 		if (newWithdrawBPS != 0) gelatoWithdrawBPS = newWithdrawBPS;
-		if (newSlippageBPS != 0) gelatoSlippageBPS = newSlippageBPS;
+		if (newSlippageBPS != 0) oracleSlippageBPS = newSlippageBPS;
 		if (newSlippageInterval != 0) gelatoSlippageInterval = newSlippageInterval;
 		if (newTreasury != address(0)) managerTreasury = newTreasury;
 	}
@@ -176,5 +180,9 @@ abstract contract GUniPoolStorage is
 	function setKeeperAddress(address _keeperAddress) external onlyManager {
 		require(_keeperAddress != address(0), "zeroAddress");
 		keeperAddress = _keeperAddress;
+	}
+
+	function setManagerParams(uint256 _slippageMax) external onlyManager {
+		slippageMax = _slippageMax;
 	}
 }

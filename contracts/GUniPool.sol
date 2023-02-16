@@ -224,14 +224,31 @@ contract GUniPool is
 		emit Minted(receiver, mintAmount, amount0, amount1, liquidityMinted);
 	}
 
+	// Needed to avoid error compiler stack too deep
+	struct LocalVariables_burn {
+		uint256 totalSupply;
+		uint256 liquidityBurnt;
+		int256 amount0Delta;
+		int256 amount1Delta;
+	}
+
 	/// @notice burn G-UNI tokens (fractional shares of a Uniswap V3 position) and receive tokens
+	/// @dev onlyToken0 and onlyToken1 can not be both true, but can be both false.
+	/// In the case of both false, the user receives the proportional token0 and token1 amounts.
 	/// @param burnAmount The number of G-UNI tokens to burn
+	/// @param onlyToken0 If true the user zaps out with only token0
+	/// @param onlyToken1  If true the user zaps out with only token1
 	/// @param receiver The account to receive the underlying amounts of token0 and token1
 	/// @return amount0 amount of token0 transferred to receiver for burning `burnAmount`
 	/// @return amount1 amount of token1 transferred to receiver for burning `burnAmount`
 	/// @return liquidityBurned amount of liquidity removed from the underlying Uniswap V3 position
 	// solhint-disable-next-line function-max-lines
-	function burn(uint256 burnAmount, address receiver)
+	function burn(
+		uint256 burnAmount,
+		bool onlyToken0,
+		bool onlyToken1,
+		address receiver
+	)
 		external
 		nonReentrant
 		returns (
@@ -242,7 +259,11 @@ contract GUniPool is
 	{
 		require(burnAmount > 0, "burn 0");
 
-		uint256 totalSupply = totalSupply();
+		_validateValues(onlyToken0, onlyToken1);
+
+		LocalVariables_burn memory vars;
+
+		vars.totalSupply = totalSupply();
 
 		Ticks memory ticks = baseTicks;
 
@@ -250,9 +271,9 @@ contract GUniPool is
 
 		_burn(msg.sender, burnAmount);
 
-		uint256 liquidityBurned_ = FullMath.mulDiv(burnAmount, liquidity, totalSupply);
+		vars.liquidityBurnt = FullMath.mulDiv(burnAmount, liquidity, vars.totalSupply);
 
-		liquidityBurned = SafeCast.toUint128(liquidityBurned_);
+		liquidityBurned = SafeCast.toUint128(vars.liquidityBurnt);
 
 		(uint256 burn0, uint256 burn1, uint256 fee0, uint256 fee1) = _withdraw(
 			ticks,
@@ -266,7 +287,7 @@ contract GUniPool is
 			FullMath.mulDiv(
 				token0.balanceOf(address(this)) - burn0 - managerBalance0,
 				burnAmount,
-				totalSupply
+				vars.totalSupply
 			);
 
 		amount1 =
@@ -274,16 +295,19 @@ contract GUniPool is
 			FullMath.mulDiv(
 				token1.balanceOf(address(this)) - burn1 - managerBalance1,
 				burnAmount,
-				totalSupply
+				vars.totalSupply
 			);
 
-		if (amount0 > 0) {
-			token0.safeTransfer(receiver, amount0);
+		// ZapOut logic
+		if (onlyToken0) {
+			(vars.amount0Delta, ) = _swap(amount1, false);
+			amount0 = uint256(SafeCast.toInt256(amount0) - vars.amount0Delta);
+		} else if (onlyToken1) {
+			(, vars.amount1Delta) = _swap(amount0, true);
+			amount1 = uint256(SafeCast.toInt256(amount1) - vars.amount1Delta);
 		}
 
-		if (amount1 > 0) {
-			token1.safeTransfer(receiver, amount1);
-		}
+		_transferAmounts(amount0, amount1, receiver);
 
 		emit Burned(receiver, burnAmount, amount0, amount1, liquidityBurned);
 	}
@@ -471,8 +495,8 @@ contract GUniPool is
 		uint256 fee1 = _computeFeesEarned(false, feeGrowthInside1Last, tick, liquidity) +
 			uint256(tokensOwed1);
 
-		fee0 = (fee0 * (10000 - managerFeeBPS)) / 10000;
-		fee1 = (fee1 * (10000 - managerFeeBPS)) / 10000;
+		fee0 = (fee0 * (basisOne - managerFeeBPS)) / basisOne;
+		fee1 = (fee1 * (basisOne - managerFeeBPS)) / basisOne;
 
 		// Add any leftover in contract to current holdings
 		amount0Current += fee0 + token0.balanceOf(address(this)) - managerBalance0;
@@ -589,7 +613,7 @@ contract GUniPool is
 		}
 
 		int256 swapAmount = SafeCast.toInt256(
-			((zeroForOne ? amount0 : amount1) * swapAmountBPS) / 10000
+			((zeroForOne ? amount0 : amount1) * swapAmountBPS) / basisOne
 		);
 		if (swapAmount > 0) {
 			_swapAndDeposit(ticks, amount0, amount1, swapAmount, swapThresholdPrice, zeroForOne);
@@ -628,6 +652,38 @@ contract GUniPool is
 		if (liquidityAfterSwap > 0) {
 			pool.mint(address(this), ticks.lowerTick, ticks.upperTick, liquidityAfterSwap, "");
 		}
+	}
+
+	/// @notice There is a global slippage variable for swapping amounts controlled by manager
+	function _swap(uint256 _amountIn, bool _zeroForOne) internal returns (int256, int256) {
+		(uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
+		uint256 slippage = _zeroForOne ? (basisOne - slippageMax) : (basisOne + slippageMax);
+		return
+			pool.swap(
+				address(this),
+				_zeroForOne, // Swap direction, true: token0 -> token1, false: token1 -> token0
+				int256(_amountIn),
+				uint160(uint256((sqrtPriceX96 * slippage) / basisOne)), // sqrtPriceLimitX96
+				abi.encode(0)
+			);
+	}
+
+	function _transferAmounts(
+		uint256 amount0,
+		uint256 amount1,
+		address receiver
+	) internal {
+		if (amount0 > 0) {
+			token0.safeTransfer(receiver, amount0);
+		}
+
+		if (amount1 > 0) {
+			token1.safeTransfer(receiver, amount1);
+		}
+	}
+
+	function _validateValues(bool onlyToken0, bool onlyToken1) internal {
+		if (onlyToken0 && onlyToken1) revert("invalid inputs");
 	}
 
 	// solhint-disable-next-line function-max-lines, code-complexity
@@ -720,8 +776,8 @@ contract GUniPool is
 		private
 		returns (uint256 fee0, uint256 fee1)
 	{
-		uint256 managerFee0 = (rawFee0 * managerFeeBPS) / 10000;
-		uint256 managerFee1 = (rawFee1 * managerFeeBPS) / 10000;
+		uint256 managerFee0 = (rawFee0 * managerFeeBPS) / basisOne;
+		uint256 managerFee1 = (rawFee1 * managerFeeBPS) / basisOne;
 
 		managerBalance0 += managerFee0;
 		managerBalance1 += managerFee1;
@@ -748,7 +804,7 @@ contract GUniPool is
 			avgSqrtRatioX96 = avgTick.getSqrtRatioAtTick();
 		}
 
-		uint160 maxSlippage = (avgSqrtRatioX96 * gelatoSlippageBPS) / 10000;
+		uint160 maxSlippage = (avgSqrtRatioX96 * oracleSlippageBPS) / 10000;
 		if (zeroForOne) {
 			require(swapThresholdPrice >= avgSqrtRatioX96 - maxSlippage, "high slippage");
 		} else {
