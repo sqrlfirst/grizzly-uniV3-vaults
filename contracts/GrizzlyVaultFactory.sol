@@ -151,7 +151,7 @@ contract GrizzlyVaultFactory is IGrizzlyVaultFactory, Ownable {
 		string memory symbol0 = IERC20Metadata(token0).symbol();
 		string memory symbol1 = IERC20Metadata(token1).symbol();
 
-		return _append("Grizzly Uniswap LP ", symbol0, "/", symbol1, " LP");
+		return _append("Grizzly Uniswap ", symbol0, "/", symbol1, " LP");
 	}
 
 	function _append(
