@@ -5,59 +5,74 @@ import { IUniswapV3Factory } from "@uniswap/v3-core/contracts/interfaces/IUniswa
 import { IUniswapV3TickSpacing } from "./interfaces/IUniswapV3TickSpacing.sol";
 import { IGrizzlyVaultFactory } from "./interfaces/IGrizzlyVaultFactory.sol";
 import { IGrizzlyVaultStorage } from "./interfaces/IGrizzlyVaultStorage.sol";
-import { GrizzlyVaultFactoryStorage } from "./abstract/GrizzlyVaultFactoryStorage.sol";
-import { EIP173Proxy } from "./vendor/proxy/EIP173Proxy.sol";
-import { IEIP173Proxy } from "./interfaces/IEIP173Proxy.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-contract GrizzlyVaultFactory is GrizzlyVaultFactoryStorage, IGrizzlyVaultFactory {
+contract GrizzlyVaultFactory is IGrizzlyVaultFactory, Ownable {
 	using EnumerableSet for EnumerableSet.AddressSet;
 
-	// solhint-disable-next-line no-empty-blocks
-	constructor(address _uniswapV3Factory) GrizzlyVaultFactoryStorage(_uniswapV3Factory) {}
+	string public constant name = "GrizzlyVaultCloneFactory";
+	string public constant version = "1.0.0";
 
-	/// @notice createManagedPool creates a new instance of a G-UNI token on a specified
-	/// UniswapV3Pool. The msg.sender is the initial manager of the pool and will
-	/// forever be associated with the G-UNI pool as it's `deployer`
-	/// @param tokenA one of the tokens in the uniswap pair
-	/// @param tokenB the other token in the uniswap pair
-	/// @param uniFee fee tier of the uniswap pair
-	/// @param managerFee proportion of earned fees that go to pool manager in Basis Points
-	/// @param lowerTick initial lower bound of the Uniswap V3 position
-	/// @param upperTick initial upper bound of the Uniswap V3 position
-	/// @return pool the address of the newly created G-UNI pool (proxy)
-	function createManagedPool(
-		address tokenA,
-		address tokenB,
-		uint24 uniFee,
-		uint16 managerFee,
-		int24 lowerTick,
-		int24 upperTick
-	) external override returns (address pool) {
-		return _createPool(tokenA, tokenB, uniFee, managerFee, lowerTick, upperTick, msg.sender);
+	address public immutable factory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+
+	address public implementation;
+	address public grizzlyDeployer;
+
+	mapping(address => EnumerableSet.AddressSet) internal _vaults;
+
+	event VaultCreated(address indexed uniPool, address indexed manager, address indexed pool);
+	event ImplementationVaultChanged(address newImplementation, address origImplementation);
+
+	constructor(address _implementation, address _grizzlyDeployer) {
+		implementation = _implementation;
+		grizzlyDeployer = _grizzlyDeployer;
 	}
 
-	/// @notice createPool creates a new instance of a G-UNI token on a specified
-	/// UniswapV3Pool. Here the manager role is immediately burned, however msg.sender will still
-	/// forever be associated with the G-UNI pool as it's `deployer`
-	/// @param tokenA one of the tokens in the uniswap pair
-	/// @param tokenB the other token in the uniswap pair
-	/// @param uniFee fee tier of the uniswap pair
-	/// @param lowerTick initial lower bound of the Uniswap V3 position
-	/// @param upperTick initial upper bound of the Uniswap V3 position
-	/// @return pool the address of the newly created G-UNI pool (proxy)
-	function createPool(
-		address tokenA,
-		address tokenB,
-		uint24 uniFee,
-		int24 lowerTick,
-		int24 upperTick
-	) external override returns (address pool) {
-		return _createPool(tokenA, tokenB, uniFee, 0, lowerTick, upperTick, address(0));
+	/// @notice getGrizzlyVaults gets all the Grizzly Vaults deployed by Grizzly's
+	/// default deployer address (since anyone can deploy and manage Grizzly Vaults)
+	/// @return array of Grizzly managed Vault addresses
+	function getGrizzlyVaults() external view returns (address[] memory) {
+		return getVaults(grizzlyDeployer);
 	}
 
-	function _createPool(
+	/// @notice getVaults fetches all the Grizzly Vault addresses deployed by `deployer`
+	/// @param deployer Address that has potentially deployed Grizzly Vaults (can return empty array)
+	/// @return vaults Array of Grizzly Vault addresses deployed by `deployer`
+	function getVaults(address deployer) public view returns (address[] memory) {
+		uint256 length = numVaults(deployer);
+		address[] memory vaults = new address[](length);
+		for (uint256 i = 0; i < length; i++) {
+			vaults[i] = _getVault(deployer, i);
+		}
+
+		return vaults;
+	}
+
+	/// @notice numVaults counts the total number of Grizzly Vaults deployed by `deployer`
+	/// @param deployer Deployer address
+	/// @return total Number of Grizzly Vaults deployed by `deployer`
+	function numVaults(address deployer) public view returns (uint256) {
+		return _vaults[deployer].length();
+	}
+
+	function _getVault(address deployer, uint256 index) internal view returns (address) {
+		return _vaults[deployer].at(index);
+	}
+
+	// ---- Cloning ---- //
+
+	/// @notice clones our original vault implementation contract functionality in an immutable way
+	/// Clones have the exact same logic as the implementation contract but with its own storage state
+	/// @param tokenA One of the tokens in the uniswap pair
+	/// @param tokenB The other token in the uniswap pair
+	/// @param uniFee Fee tier of the uniswap pair
+	/// @param managerFee Proportion of earned fees that go to pool manager in Basis Points
+	/// @param lowerTick Initial lower bound of the Uniswap V3 position
+	/// @param upperTick Initial upper bound of the Uniswap V3 position
+	/// @return newVault Address of the newly created Grizzly Vault (proxy)
+	function cloneGrizzlyVault(
 		address tokenA,
 		address tokenB,
 		uint24 uniFee,
@@ -65,32 +80,52 @@ contract GrizzlyVaultFactory is GrizzlyVaultFactoryStorage, IGrizzlyVaultFactory
 		int24 lowerTick,
 		int24 upperTick,
 		address manager
-	) internal returns (address pool) {
+	) external override returns (address newVault) {
 		(address token0, address token1) = _getTokenOrder(tokenA, tokenB);
 
-		pool = address(new EIP173Proxy(poolImplementation, address(this), ""));
-
-		string memory name = "Gelato Uniswap LP";
+		string memory name = "Grizzly Uniswap LP";
 		try this.getTokenName(token0, token1) returns (string memory result) {
 			name = result;
 		} catch {} // solhint-disable-line no-empty-blocks
 
 		address uniPool = IUniswapV3Factory(factory).getPool(token0, token1, uniFee);
-		require(uniPool != address(0), "uniswap pool does not exist");
+		require(uniPool != address(0), "uniV3Pool does not exist");
 		require(_validateTickSpacing(uniPool, lowerTick, upperTick), "tickSpacing mismatch");
 
-		IGrizzlyVaultStorage(pool).initialize(
+		// Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
+		bytes20 addressBytes = bytes20(implementation);
+		assembly {
+			// EIP-1167 bytecode
+			let clone_code := mload(0x40)
+			mstore(clone_code, 0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000)
+			mstore(add(clone_code, 0x14), addressBytes)
+			mstore(
+				add(clone_code, 0x28),
+				0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
+			)
+			newVault := create(0, clone_code, 0x37)
+		}
+
+		IGrizzlyVaultStorage(newVault).initialize(
 			name,
-			"G-UNI",
+			string(
+				abi.encodePacked(
+					"hs",
+					IERC20Metadata(address(token0)).symbol(),
+					"-",
+					IERC20Metadata(address(token1)).symbol()
+				)
+			),
 			uniPool,
 			managerFee,
 			lowerTick,
 			upperTick,
 			manager
 		);
-		_deployers.add(msg.sender);
-		_pools[msg.sender].add(pool);
-		emit PoolCreated(uniPool, manager, pool);
+
+		_vaults[msg.sender].add(newVault);
+
+		emit VaultCreated(uniPool, manager, newVault);
 	}
 
 	function _validateTickSpacing(
@@ -102,115 +137,6 @@ contract GrizzlyVaultFactory is GrizzlyVaultFactoryStorage, IGrizzlyVaultFactory
 		return lowerTick < upperTick && lowerTick % spacing == 0 && upperTick % spacing == 0;
 	}
 
-	function getTokenName(address token0, address token1) external view returns (string memory) {
-		string memory symbol0 = IERC20Metadata(token0).symbol();
-		string memory symbol1 = IERC20Metadata(token1).symbol();
-
-		return _append("Gelato Uniswap ", symbol0, "/", symbol1, " LP");
-	}
-
-	function upgradePools(address[] memory pools) external onlyManager {
-		for (uint256 i = 0; i < pools.length; i++) {
-			IEIP173Proxy(pools[i]).upgradeTo(poolImplementation);
-		}
-	}
-
-	function upgradePoolsAndCall(address[] memory pools, bytes[] calldata datas)
-		external
-		onlyManager
-	{
-		require(pools.length == datas.length, "mismatching array length");
-		for (uint256 i = 0; i < pools.length; i++) {
-			IEIP173Proxy(pools[i]).upgradeToAndCall(poolImplementation, datas[i]);
-		}
-	}
-
-	function makePoolsImmutable(address[] memory pools) external onlyManager {
-		for (uint256 i = 0; i < pools.length; i++) {
-			IEIP173Proxy(pools[i]).transferProxyAdmin(address(0));
-		}
-	}
-
-	/// @notice isPoolImmutable checks if a certain G-UNI pool is "immutable" i.e. that the
-	/// proxyAdmin is the zero address and thus the underlying implementation cannot be upgraded
-	/// @param pool address of the G-UNI pool
-	/// @return bool signaling if pool is immutable (true) or not (false)
-	function isPoolImmutable(address pool) external view returns (bool) {
-		return address(0) == getProxyAdmin(pool);
-	}
-
-	/// @notice getGelatoPools gets all the G-UNI pools deployed by Gelato's
-	/// default deployer address (since anyone can deploy and manage G-UNI pools)
-	/// @return list of Gelato managed G-UNI pool addresses
-	function getGelatoPools() external view returns (address[] memory) {
-		return getPools(gelatoDeployer);
-	}
-
-	/// @notice getDeployers fetches all addresses that have deployed a G-UNI pool
-	/// @return deployers the list of deployer addresses
-	function getDeployers() public view returns (address[] memory) {
-		uint256 length = numDeployers();
-		address[] memory deployers = new address[](length);
-		for (uint256 i = 0; i < length; i++) {
-			deployers[i] = _getDeployer(i);
-		}
-
-		return deployers;
-	}
-
-	/// @notice getPools fetches all the G-UNI pool addresses deployed by `deployer`
-	/// @param deployer address that has potentially deployed G-UNI pools (can return empty array)
-	/// @return pools the list of G-UNI pool addresses deployed by `deployer`
-	function getPools(address deployer) public view returns (address[] memory) {
-		uint256 length = numPools(deployer);
-		address[] memory pools = new address[](length);
-		for (uint256 i = 0; i < length; i++) {
-			pools[i] = _getPool(deployer, i);
-		}
-
-		return pools;
-	}
-
-	/// @notice numPools counts the total number of G-UNI pools in existence
-	/// @return result total number of G-UNI pools deployed
-	function numPools() public view returns (uint256 result) {
-		address[] memory deployers = getDeployers();
-		for (uint256 i = 0; i < deployers.length; i++) {
-			result += numPools(deployers[i]);
-		}
-	}
-
-	/// @notice numDeployers counts the total number of G-UNI pool deployer addresses
-	/// @return total number of G-UNI pool deployer addresses
-	function numDeployers() public view returns (uint256) {
-		return _deployers.length();
-	}
-
-	/// @notice numPools counts the total number of G-UNI pools deployed by `deployer`
-	/// @param deployer deployer address
-	/// @return total number of G-UNI pools deployed by `deployer`
-	function numPools(address deployer) public view returns (uint256) {
-		return _pools[deployer].length();
-	}
-
-	/// @notice getProxyAdmin gets the current address who controls the underlying implementation
-	/// of a G-UNI pool. For most all pools either this contract address or the zero address will
-	/// be the proxyAdmin. If the admin is the zero address the pool's implementation is naturally
-	/// no longer upgradable (no one owns the zero address).
-	/// @param pool address of the G-UNI pool
-	/// @return address that controls the G-UNI implementation (has power to upgrade it)
-	function getProxyAdmin(address pool) public view returns (address) {
-		return IEIP173Proxy(pool).proxyAdmin();
-	}
-
-	function _getDeployer(uint256 index) internal view returns (address) {
-		return _deployers.at(index);
-	}
-
-	function _getPool(address deployer, uint256 index) internal view returns (address) {
-		return _pools[deployer].at(index);
-	}
-
 	function _getTokenOrder(address tokenA, address tokenB)
 		internal
 		pure
@@ -218,7 +144,14 @@ contract GrizzlyVaultFactory is GrizzlyVaultFactoryStorage, IGrizzlyVaultFactory
 	{
 		require(tokenA != tokenB, "same token");
 		(token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-		require(token0 != address(0), "no address zero");
+		require(token0 != address(0), "zeroAddress");
+	}
+
+	function getTokenName(address token0, address token1) external view returns (string memory) {
+		string memory symbol0 = IERC20Metadata(token0).symbol();
+		string memory symbol1 = IERC20Metadata(token1).symbol();
+
+		return _append("Grizzly Uniswap LP ", symbol0, "/", symbol1, " LP");
 	}
 
 	function _append(
@@ -229,5 +162,12 @@ contract GrizzlyVaultFactory is GrizzlyVaultFactoryStorage, IGrizzlyVaultFactory
 		string memory e
 	) internal pure returns (string memory) {
 		return string(abi.encodePacked(a, b, c, d, e));
+	}
+
+	function setImplementationVault(address _newImplementation) external onlyOwner {
+		require(_newImplementation != address(0), "zeroAddress");
+		address oldImplementationVault = implementation;
+		implementation = _newImplementation;
+		emit ImplementationVaultChanged(implementation, oldImplementationVault);
 	}
 }

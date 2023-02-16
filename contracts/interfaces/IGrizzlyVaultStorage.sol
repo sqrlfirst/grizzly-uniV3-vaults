@@ -9,6 +9,6 @@ interface IGrizzlyVaultStorage {
 		uint16 _managerFeeBPS,
 		int24 _lowerTick,
 		int24 _upperTick,
-		address _manager_
+		address _manager
 	) external;
 }
