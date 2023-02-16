@@ -300,10 +300,10 @@ contract GUniPool is
 
 		// ZapOut logic
 		if (onlyToken0) {
-			(vars.amount0Delta, ) = _swap(amount1, false);
+			(vars.amount0Delta, ) = _swap(amount1, false, slippageUserMax);
 			amount0 = uint256(SafeCast.toInt256(amount0) - vars.amount0Delta);
 		} else if (onlyToken1) {
-			(, vars.amount1Delta) = _swap(amount0, true);
+			(, vars.amount1Delta) = _swap(amount0, true, slippageUserMax);
 			amount1 = uint256(SafeCast.toInt256(amount1) - vars.amount1Delta);
 		}
 
@@ -316,24 +316,21 @@ contract GUniPool is
 
 	/// @notice Change the range of underlying UniswapV3 position, only manager can call
 	/// @dev When changing the range the inventory of token0 and token1 may be rebalanced
-	/// with a swap to deposit as much liquidity as possible into the new position. Swap parameters
-	/// can be computed by simulating the whole operation: remove all liquidity, deposit as much
-	/// as possible into new position, then observe how much of token0 or token1 is leftover.
+	/// with a swap to deposit as much liquidity as possible into the new position.
 	/// Swap a proportion of this leftover to deposit more liquidity into the position, since
 	/// any leftover will be unused and sit idle until the next rebalance.
 	/// @param newLowerTick The new lower bound of the position's range
 	/// @param newUpperTick The new upper bound of the position's range
-	/// @param swapThresholdPrice slippage parameter on the swap as a max or min sqrtPriceX96
-	/// @param swapAmountBPS amount of token to swap as proportion of total. Pass 0 to ignore swap.
-	/// @param zeroForOne Which token to input into the swap (true = token0, false = token1)
+	/// @param minLiquidity Minimum liquidity of the new position in order to not revert
 	// solhint-disable-next-line function-max-lines
 	function executiveRebalance(
 		int24 newLowerTick,
 		int24 newUpperTick,
-		uint160 swapThresholdPrice,
-		uint256 swapAmountBPS,
-		bool zeroForOne
+		uint128 minLiquidity
 	) external onlyManager {
+		// First check pool health
+		_checkPriceSlippage();
+
 		uint128 liquidity;
 		uint128 newLiquidity;
 
@@ -354,10 +351,16 @@ contract GUniPool is
 			uint256 reinvest0 = token0.balanceOf(address(this)) - managerBalance0;
 			uint256 reinvest1 = token1.balanceOf(address(this)) - managerBalance1;
 
-			_deposit(newTicks, reinvest0, reinvest1, swapThresholdPrice, swapAmountBPS, zeroForOne);
+			(uint256 finalAmount0, uint256 finalAmount1) = _balanceAmounts(
+				newTicks,
+				reinvest0,
+				reinvest1
+			);
+
+			_addLiquidity(ticks, finalAmount0, finalAmount1);
 
 			(newLiquidity, , , , ) = pool.positions(_getPositionID(newTicks));
-			require(newLiquidity > 0, "new position 0");
+			require(newLiquidity > minLiquidity, "min liquidity");
 		} else {
 			// Update storage ticks
 			baseTicks = newTicks;
@@ -369,15 +372,11 @@ contract GUniPool is
 	// Authorized functions => Can be automated
 
 	/// @notice Reinvest fees earned into underlying position, only authorized executors can call.
+	/// @dev As the ticks do not change, liquidity must increase, otherwise will revert.
 	/// Position bounds CANNOT be altered, only manager may via executiveRebalance.
-	function rebalance(
-		uint160 swapThresholdPrice,
-		uint256 swapAmountBPS,
-		bool zeroForOne
-	) external onlyAuthorized {
-		if (swapAmountBPS > 0) {
-			_checkSlippage(swapThresholdPrice, zeroForOne);
-		}
+	function rebalance() external onlyAuthorized {
+		// First check pool health
+		_checkPriceSlippage();
 
 		Ticks memory ticks = baseTicks;
 
@@ -386,7 +385,7 @@ contract GUniPool is
 
 		(uint128 liquidity, , , , ) = pool.positions(key);
 
-		_rebalance(liquidity, swapThresholdPrice, swapAmountBPS, zeroForOne, ticks);
+		_rebalance(liquidity, ticks);
 
 		(uint128 newLiquidity, , , , ) = pool.positions(key);
 		require(newLiquidity > liquidity, "liquidity must increase");
@@ -394,7 +393,7 @@ contract GUniPool is
 		emit Rebalance(ticks.lowerTick, ticks.upperTick, liquidity, newLiquidity);
 	}
 
-	/// @notice withdraw manager fees accrued, only authorized executors can call.
+	/// @notice Withdraw manager fees accrued, only authorized executors can call.
 	/// Target account to receive fees is managerTreasury, alterable by only manager.
 	function withdrawManagerBalance() external onlyAuthorized {
 		uint256 amount0 = managerBalance0;
@@ -535,32 +534,29 @@ contract GUniPool is
 			);
 	}
 
-	// Private functions
+	// Internal functions
 
 	// solhint-disable-next-line function-max-lines
-	function _rebalance(
-		uint128 liquidity,
-		uint160 swapThresholdPrice,
-		uint256 swapAmountBPS,
-		bool zeroForOne,
-		Ticks memory ticks
-	) private {
-		uint256 leftover0 = token0.balanceOf(address(this)) - managerBalance0;
-		uint256 leftover1 = token1.balanceOf(address(this)) - managerBalance1;
-
+	function _rebalance(uint128 liquidity, Ticks memory ticks) internal {
 		(, , uint256 feesEarned0, uint256 feesEarned1) = _withdraw(ticks, liquidity);
 
 		(feesEarned0, feesEarned1) = _applyFees(feesEarned0, feesEarned1);
 
-		feesEarned0 += leftover0;
-		feesEarned1 += leftover1;
+		uint256 leftover0 = token0.balanceOf(address(this)) - managerBalance0;
+		uint256 leftover1 = token1.balanceOf(address(this)) - managerBalance1;
 
-		_deposit(ticks, leftover0, leftover1, swapThresholdPrice, swapAmountBPS, zeroForOne);
+		(uint256 finalAmount0, uint256 finalAmount1) = _balanceAmounts(
+			ticks,
+			leftover0,
+			leftover1
+		);
+
+		_addLiquidity(ticks, finalAmount0, finalAmount1);
 	}
 
 	// solhint-disable-next-line function-max-lines
 	function _withdraw(Ticks memory _ticks, uint128 liquidity)
-		private
+		internal
 		returns (
 			uint256 burn0,
 			uint256 burn1,
@@ -585,69 +581,72 @@ contract GUniPool is
 		fee1 = token1.balanceOf(address(this)) - preBalance1 - burn1;
 	}
 
-	// solhint-disable-next-line function-max-lines
-	function _deposit(
+	function _balanceAmounts(
 		Ticks memory ticks,
-		uint256 amount0,
-		uint256 amount1,
-		uint160 swapThresholdPrice,
-		uint256 swapAmountBPS,
-		bool zeroForOne
-	) private {
+		uint256 amount0Desired,
+		uint256 amount1Desired
+	) internal returns (uint256 finalAmount0, uint256 finalAmount1) {
 		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
 
-		// First, deposit as much as we can
-		uint128 baseLiquidity = _liquidityForAmounts(ticks, sqrtRatioX96, amount0, amount1);
+		// Get max liquidity for amounts available
+		uint128 liquidity = _liquidityForAmounts(
+			ticks,
+			sqrtRatioX96,
+			amount0Desired,
+			amount1Desired
+		);
 
-		if (baseLiquidity > 0) {
-			(uint256 amountDeposited0, uint256 amountDeposited1) = pool.mint(
-				address(this),
-				ticks.lowerTick,
-				ticks.upperTick,
-				baseLiquidity,
-				""
-			);
+		// Get correct amounts of each token for the liquidity we have
+		(uint256 amount0, uint256 amount1) = _amountsForLiquidity(liquidity, ticks, sqrtRatioX96);
 
-			amount0 -= amountDeposited0;
-			amount1 -= amountDeposited1;
+		// Determine the trade direction
+		bool _zeroForOne;
+		if (amount1Desired == 0) {
+			_zeroForOne = true;
+		} else {
+			_zeroForOne = _amountsDirection(amount0Desired, amount1Desired, amount0, amount1);
 		}
 
-		int256 swapAmount = SafeCast.toInt256(
-			((zeroForOne ? amount0 : amount1) * swapAmountBPS) / basisOne
-		);
-		if (swapAmount > 0) {
-			_swapAndDeposit(ticks, amount0, amount1, swapAmount, swapThresholdPrice, zeroForOne);
+		// Determine the amount to swap
+		uint256 _amountSpecified = _zeroForOne
+			? (amount0Desired - (((amount0 * (basisOne + uniPoolFee / 2)) / basisOne) / 2))
+			: (amount1Desired - (((amount1 * (basisOne + uniPoolFee / 2)) / basisOne) / 2));
+
+		if (_amountSpecified > 0) {
+			(int256 amount0Delta, int256 amount1Delta) = _swap(
+				_amountSpecified,
+				_zeroForOne,
+				slippageRebalanceMax
+			);
+			finalAmount0 = uint256(SafeCast.toInt256(amount0) - amount0Delta);
+			finalAmount1 = uint256(SafeCast.toInt256(amount1) - amount1Delta);
+		} else {
+			return (amount0, amount1);
 		}
 	}
 
-	function _swapAndDeposit(
+	/// @dev Needed in case token0 and token1 have different decimals
+	function _amountsDirection(
+		uint256 amount0Desired,
+		uint256 amount1Desired,
+		uint256 amount0,
+		uint256 amount1
+	) internal pure returns (bool zeroGreaterOne) {
+		zeroGreaterOne = (amount0Desired - amount0) * amount1Desired >
+			(amount1Desired - amount1) * amount0Desired
+			? true
+			: false;
+	}
+
+	function _addLiquidity(
 		Ticks memory ticks,
 		uint256 amount0,
-		uint256 amount1,
-		int256 swapAmount,
-		uint160 swapThresholdPrice,
-		bool zeroForOne
-	) private returns (uint256 finalAmount0, uint256 finalAmount1) {
-		(int256 amount0Delta, int256 amount1Delta) = pool.swap(
-			address(this),
-			zeroForOne,
-			swapAmount,
-			swapThresholdPrice,
-			""
-		);
-
-		finalAmount0 = uint256(SafeCast.toInt256(amount0) - amount0Delta);
-		finalAmount1 = uint256(SafeCast.toInt256(amount1) - amount1Delta);
-
-		// Add liquidity a second time
+		uint256 amount1
+	) internal {
+		// As we have made a swap in the pool sqrtRatioX96 changes
 		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
 
-		uint128 liquidityAfterSwap = _liquidityForAmounts(
-			ticks,
-			sqrtRatioX96,
-			finalAmount0,
-			finalAmount1
-		);
+		uint128 liquidityAfterSwap = _liquidityForAmounts(ticks, sqrtRatioX96, amount0, amount1);
 
 		if (liquidityAfterSwap > 0) {
 			pool.mint(address(this), ticks.lowerTick, ticks.upperTick, liquidityAfterSwap, "");
@@ -655,9 +654,13 @@ contract GUniPool is
 	}
 
 	/// @notice There is a global slippage variable for swapping amounts controlled by manager
-	function _swap(uint256 _amountIn, bool _zeroForOne) internal returns (int256, int256) {
+	function _swap(
+		uint256 _amountIn,
+		bool _zeroForOne,
+		uint256 _slippageMax
+	) internal returns (int256, int256) {
 		(uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
-		uint256 slippage = _zeroForOne ? (basisOne - slippageMax) : (basisOne + slippageMax);
+		uint256 slippage = _zeroForOne ? (basisOne - _slippageMax) : (basisOne + _slippageMax);
 		return
 			pool.swap(
 				address(this),
@@ -692,7 +695,7 @@ contract GUniPool is
 		uint256 amount0Max,
 		uint256 amount1Max
 	)
-		private
+		internal
 		view
 		returns (
 			uint256 amount0,
@@ -708,7 +711,7 @@ contract GUniPool is
 		} else if (amount1Current == 0 && amount0Current > 0) {
 			mintAmount = FullMath.mulDiv(amount0Max, totalSupply, amount0Current);
 		} else if (amount0Current == 0 && amount1Current == 0) {
-			revert("");
+			revert("no balances");
 		} else {
 			// Only if both are non-zero
 			uint256 amount0Mint = FullMath.mulDiv(amount0Max, totalSupply, amount0Current);
@@ -729,7 +732,7 @@ contract GUniPool is
 		uint256 feeGrowthInsideLast,
 		int24 tick,
 		uint128 liquidity
-	) private view returns (uint256 fee) {
+	) internal view returns (uint256 fee) {
 		uint256 feeGrowthOutsideLower;
 		uint256 feeGrowthOutsideUpper;
 		uint256 feeGrowthGlobal;
@@ -773,7 +776,7 @@ contract GUniPool is
 	}
 
 	function _applyFees(uint256 rawFee0, uint256 rawFee1)
-		private
+		internal
 		returns (uint256 fee0, uint256 fee1)
 	{
 		uint256 managerFee0 = (rawFee0 * managerFeeBPS) / basisOne;
@@ -788,9 +791,9 @@ contract GUniPool is
 		emit FeesEarned(fee0, fee1);
 	}
 
-	function _checkSlippage(uint160 swapThresholdPrice, bool zeroForOne) private view {
+	function _checkPriceSlippage() internal view {
 		uint32[] memory secondsAgo = new uint32[](2);
-		secondsAgo[0] = gelatoSlippageInterval;
+		secondsAgo[0] = oracleSlippageInterval;
 		secondsAgo[1] = 0;
 
 		(int56[] memory tickCumulatives, ) = pool.observe(secondsAgo);
@@ -799,16 +802,30 @@ contract GUniPool is
 		uint160 avgSqrtRatioX96;
 		unchecked {
 			int24 avgTick = int24(
-				(tickCumulatives[1] - tickCumulatives[0]) / int56(uint56(gelatoSlippageInterval))
+				(tickCumulatives[1] - tickCumulatives[0]) / int56(uint56(oracleSlippageInterval))
 			);
 			avgSqrtRatioX96 = avgTick.getSqrtRatioAtTick();
 		}
 
+		(uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
+
+		uint160 diff = avgSqrtRatioX96 > sqrtPriceX96
+			? avgSqrtRatioX96 - sqrtPriceX96
+			: sqrtPriceX96 - avgSqrtRatioX96;
+
 		uint160 maxSlippage = (avgSqrtRatioX96 * oracleSlippageBPS) / 10000;
-		if (zeroForOne) {
-			require(swapThresholdPrice >= avgSqrtRatioX96 - maxSlippage, "high slippage");
-		} else {
-			require(swapThresholdPrice <= avgSqrtRatioX96 + maxSlippage, "high slippage");
-		}
+
+		require(diff < maxSlippage, "high slippage");
+	}
+
+	/// @notice Returns swapThresholdPrice according a desired slippage amount
+	function getSwapThresholdPrice(bool _zeroForOne, uint256 _slippageMax)
+		external
+		view
+		returns (uint160 swapThresholdPrice)
+	{
+		(uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
+		uint256 slippage = _zeroForOne ? (basisOne - _slippageMax) : (basisOne + _slippageMax);
+		return uint160(uint256((sqrtPriceX96 * slippage) / basisOne));
 	}
 }

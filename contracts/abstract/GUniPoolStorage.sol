@@ -34,7 +34,7 @@ abstract contract GUniPoolStorage is
 	uint16 public gelatoRebalanceBPS;
 	uint16 public gelatoWithdrawBPS;
 	uint16 public oracleSlippageBPS;
-	uint32 public gelatoSlippageInterval;
+	uint32 public oracleSlippageInterval;
 
 	uint16 public managerFeeBPS;
 	address public managerTreasury;
@@ -45,12 +45,14 @@ abstract contract GUniPoolStorage is
 	IUniswapV3Pool public pool;
 	IERC20 public token0;
 	IERC20 public token1;
+	uint24 uniPoolFee;
 
 	uint256 internal constant MIN_INITIAL_SHARES = 1e9;
 	uint256 internal constant basisOne = 10000;
 
 	// In bps, how much slippage we allow between swaps -> 50 = 0.5% slippage
-	uint256 public slippageMax = 100;
+	uint256 public slippageUserMax = 100;
+	uint256 public slippageRebalanceMax = 100;
 
 	bool internal isOriginal = true; // check for cloning
 
@@ -67,7 +69,7 @@ abstract contract GUniPoolStorage is
 		uint16 gelatoRebalanceBPS,
 		uint16 gelatoWithdrawBPS,
 		uint16 oracleSlippageBPS,
-		uint32 gelatoSlippageInterval
+		uint32 oracleSlippageInterval
 	);
 
 	event SetManagerFee(uint16 managerFee);
@@ -101,10 +103,11 @@ abstract contract GUniPoolStorage is
 		pool = IUniswapV3Pool(_pool);
 		token0 = IERC20(pool.token0());
 		token1 = IERC20(pool.token1());
+		uniPoolFee = pool.fee();
 		managerFeeBPS = _managerFeeBPS; // if set to 0 here manager can still initialize later
 
 		// these variables can be updated by the manager
-		gelatoSlippageInterval = 5 minutes; // default: last five minutes;
+		oracleSlippageInterval = 5 minutes; // default: last five minutes;
 		oracleSlippageBPS = 500; // default: 5% slippage
 		gelatoWithdrawBPS = 100; // default: only auto withdraw if tx fee is lt 1% withdrawn
 		gelatoRebalanceBPS = 200; // default: only rebalance if tx fee is lt 2% reinvested
@@ -146,7 +149,7 @@ abstract contract GUniPoolStorage is
 		if (newRebalanceBPS != 0) gelatoRebalanceBPS = newRebalanceBPS;
 		if (newWithdrawBPS != 0) gelatoWithdrawBPS = newWithdrawBPS;
 		if (newSlippageBPS != 0) oracleSlippageBPS = newSlippageBPS;
-		if (newSlippageInterval != 0) gelatoSlippageInterval = newSlippageInterval;
+		if (newSlippageInterval != 0) oracleSlippageInterval = newSlippageInterval;
 		if (newTreasury != address(0)) managerTreasury = newTreasury;
 	}
 
@@ -182,7 +185,12 @@ abstract contract GUniPoolStorage is
 		keeperAddress = _keeperAddress;
 	}
 
-	function setManagerParams(uint256 _slippageMax) external onlyManager {
-		slippageMax = _slippageMax;
+	function setManagerParams(uint256 _slippageUserMax, uint256 _slippageRebalanceMax)
+		external
+		onlyManager
+	{
+		require(_slippageUserMax <= basisOne && _slippageRebalanceMax <= basisOne, "wrong inputs");
+		slippageUserMax = _slippageUserMax;
+		slippageRebalanceMax = _slippageRebalanceMax;
 	}
 }
