@@ -7,6 +7,7 @@ import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
 import "hardhat-deploy";
 import "solidity-coverage";
+import "hardhat-contract-sizer";
 import "./lib/uniswap";
 
 // Process Env Variables
@@ -64,7 +65,7 @@ const config: HardhatUserConfig = {
       {
         version: "0.8.4",
         settings: {
-          optimizer: { enabled: true, runs: 1 },
+          optimizer: { enabled: true, runs: 100 },
         },
       },
     ],
@@ -73,6 +74,13 @@ const config: HardhatUserConfig = {
   typechain: {
     outDir: "typechain",
     target: "ethers-v5",
+  },
+
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: true,
+    strict: true,
   },
 };
 

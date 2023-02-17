@@ -5,21 +5,13 @@ pragma solidity 0.8.4;
 import { IUniswapV3MintCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import { IUniswapV3SwapCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import { GrizzlyVaultStorage } from "./abstract/GrizzlyVaultStorage.sol";
-import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import { IUniswapV3Factory } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import { Multicall } from "./abstract/Multicall.sol";
 import { TickMath } from "./vendor/uniswap/TickMath.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { FullMath, LiquidityAmounts } from "./vendor/uniswap/LiquidityAmounts.sol";
 
-contract GrizzlyVault is
-	IUniswapV3MintCallback,
-	IUniswapV3SwapCallback,
-	Multicall,
-	GrizzlyVaultStorage
-{
+contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, GrizzlyVaultStorage {
 	using SafeERC20 for IERC20;
 	using TickMath for int24;
 
@@ -134,14 +126,6 @@ contract GrizzlyVault is
 
 		_mint(receiver, mintAmount);
 		emit Minted(receiver, mintAmount, amount0, amount1, liquidityMinted);
-	}
-
-	// Needed to avoid error compiler stack too deep
-	struct LocalVariables_burn {
-		uint256 totalSupply;
-		uint256 liquidityBurnt;
-		int256 amount0Delta;
-		int256 amount1Delta;
 	}
 
 	/// @notice Burn Grizzly Vault tokens (fractional shares of a UniV3 position) and receive tokens
@@ -314,13 +298,7 @@ contract GrizzlyVault is
 		managerBalance0 = 0;
 		managerBalance1 = 0;
 
-		if (amount0 > 0) {
-			token0.safeTransfer(managerTreasury, amount0);
-		}
-
-		if (amount1 > 0) {
-			token1.safeTransfer(managerTreasury, amount1);
-		}
+		_transferAmounts(amount0, amount1, managerTreasury);
 	}
 
 	// --- External view functions --- //
@@ -341,6 +319,7 @@ contract GrizzlyVault is
 		)
 	{
 		uint256 totalSupply = totalSupply();
+
 		if (totalSupply > 0) {
 			(amount0, amount1, mintAmount) = _computeMintAmounts(
 				totalSupply,
@@ -356,17 +335,6 @@ contract GrizzlyVault is
 			mintAmount = uint256(newLiquidity);
 			(amount0, amount1) = _amountsForLiquidity(newLiquidity, ticks, sqrtRatioX96);
 		}
-	}
-
-	/// @notice Returns swapThresholdPrice according a desired slippage amount
-	function getSwapThresholdPrice(bool _zeroForOne, uint256 _slippageMax)
-		external
-		view
-		returns (uint160 swapThresholdPrice)
-	{
-		(uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
-		uint256 slippage = _zeroForOne ? (basisOne - _slippageMax) : (basisOne + _slippageMax);
-		return uint160(uint256((sqrtPriceX96 * slippage) / basisOne));
 	}
 
 	/// @notice Compute total underlying holdings of the Grizzly Vault token supply

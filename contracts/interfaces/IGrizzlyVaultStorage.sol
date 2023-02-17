@@ -2,6 +2,14 @@
 pragma solidity 0.8.4;
 
 interface IGrizzlyVaultStorage {
+	// Needed to avoid error compiler stack too deep
+	struct LocalVariables_burn {
+		uint256 totalSupply;
+		uint256 liquidityBurnt;
+		int256 amount0Delta;
+		int256 amount1Delta;
+	}
+
 	function initialize(
 		string memory _name,
 		string memory _symbol,

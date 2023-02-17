@@ -54,5 +54,8 @@
   },
   "lint-staged": {
     "*.{ts,js}": "eslint -c .eslintrc.json"
+  },
+  "dependencies": {
+    "hardhat-contract-sizer": "^2.8.0"
   }
 }

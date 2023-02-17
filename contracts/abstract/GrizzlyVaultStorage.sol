@@ -6,12 +6,14 @@ import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import { IGrizzlyVaultStorage } from "../interfaces/IGrizzlyVaultStorage.sol";
 
 /// @dev Single Global upgradeable state var storage base
 /// @dev Add all inherited contracts with state vars here
 /// @dev ERC20Upgradable Includes Initialize
 // solhint-disable-next-line max-states-count
 abstract contract GrizzlyVaultStorage is
+	IGrizzlyVaultStorage,
 	ERC20Upgradeable,
 	ReentrancyGuardUpgradeable,
 	OwnableUninitialized
@@ -75,7 +77,7 @@ abstract contract GrizzlyVaultStorage is
 		int24 _lowerTick,
 		int24 _upperTick,
 		address _manager_
-	) external initializer {
+	) external override initializer {
 		require(_managerFeeBPS <= 10000, "bps");
 
 		// These variables are immutable after initialization
@@ -105,7 +107,7 @@ abstract contract GrizzlyVaultStorage is
 	/// @param newOracleSlippageBPS Maximum slippage on swaps during gelato rebalance
 	/// @param newOracleSlippageInterval Length of time for TWAP used in computing slippage on swaps
 	/// @param newTreasury Address where managerFee withdrawals are sent
-	function updateGelatoParams(
+	function updateConfigParams(
 		uint16 newOracleSlippageBPS,
 		uint32 newOracleSlippageInterval,
 		address newTreasury
@@ -125,14 +127,6 @@ abstract contract GrizzlyVaultStorage is
 		require(_managerFeeBPS > 0 && _managerFeeBPS <= 10000, "bps");
 		emit SetManagerFee(_managerFeeBPS);
 		managerFeeBPS = _managerFeeBPS;
-	}
-
-	function renounceOwnership() public virtual override onlyManager {
-		managerTreasury = address(0);
-		managerFeeBPS = 0;
-		managerBalance0 = 0;
-		managerBalance1 = 0;
-		super.renounceOwnership();
 	}
 
 	function getPositionID() external view returns (bytes32 positionID) {
