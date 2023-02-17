@@ -10,6 +10,11 @@ interface IGrizzlyVaultStorage {
 		int256 amount1Delta;
 	}
 
+	struct Ticks {
+		int24 lowerTick;
+		int24 upperTick;
+	}
+
 	function initialize(
 		string memory _name,
 		string memory _symbol,

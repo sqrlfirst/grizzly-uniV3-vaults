@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
+
 pragma solidity 0.8.4;
 
 import { OwnableUninitialized } from "./OwnableUninitialized.sol";
@@ -19,11 +20,6 @@ abstract contract GrizzlyVaultStorage is
 	OwnableUninitialized
 {
 	string public constant version = "1.0.0";
-
-	struct Ticks {
-		int24 lowerTick;
-		int24 upperTick;
-	}
 
 	Ticks public baseTicks;
 
