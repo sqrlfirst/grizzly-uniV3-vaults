@@ -5,11 +5,11 @@ pragma solidity 0.8.4;
 import { IUniswapV3MintCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import { IUniswapV3SwapCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import { GrizzlyVaultStorage } from "./abstract/GrizzlyVaultStorage.sol";
-import { TickMath } from "./vendor/uniswap/TickMath.sol";
+import { TickMath } from "./uniswap/TickMath.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import { FullMath, LiquidityAmounts } from "./vendor/uniswap/LiquidityAmounts.sol";
+import { FullMath, LiquidityAmounts } from "./uniswap/LiquidityAmounts.sol";
 
 contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, GrizzlyVaultStorage {
 	using SafeERC20 for IERC20;

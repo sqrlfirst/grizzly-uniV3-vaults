@@ -5,10 +5,10 @@ pragma solidity 0.8.4;
 import { IUniswapV3SwapCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import { IGrizzlyVault } from "./interfaces/IGrizzlyVault.sol";
-import { TickMath } from "./vendor/uniswap/TickMath.sol";
+import { TickMath } from "./uniswap/TickMath.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import { LiquidityAmounts } from "./vendor/uniswap/LiquidityAmounts.sol";
+import { LiquidityAmounts } from "./uniswap/LiquidityAmounts.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract ZapContract is IUniswapV3SwapCallback, Ownable {
