@@ -52,6 +52,12 @@ const config: HardhatUserConfig = {
       chainId: 5,
       url: `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_ID}`,
     },
+    localhost: {
+      chainId: 1,
+      url: "http://127.0.0.1:8545/",
+      allowUnlimitedContractSize: true,
+      timeout: 1000 * 60,
+    },
   },
 
   solidity: {

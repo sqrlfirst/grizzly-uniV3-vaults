@@ -36,6 +36,7 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 		int256 amount1Delta;
 	}
 
+	string public constant name = "GrizzlyVaultZapContract";
 	string public constant version = "1.0.0";
 
 	uint256 internal constant basisOne = 10000;
