@@ -156,7 +156,7 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 
 		vars.uniPoolFee = IUniswapV3Pool(pool).fee();
 
-		// Determine the amount to swap
+		// Determine the amount to swap, it is not 100% precise but is a very good approximation
 		uint256 _amountSpecified = _zeroForOne
 			? (amount0Desired - (((amount0 * (basisOne + vars.uniPoolFee / 2)) / basisOne) / 2))
 			: (amount1Desired - (((amount1 * (basisOne + vars.uniPoolFee / 2)) / basisOne) / 2));

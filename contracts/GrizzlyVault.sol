@@ -63,7 +63,7 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		require(msg.sender == address(pool), "callback caller");
 
 		if (amount0Delta > 0) token0.safeTransfer(msg.sender, uint256(amount0Delta));
-		else if (amount1Delta > 0) token1.safeTransfer(msg.sender, uint256(amount1Delta));
+		if (amount1Delta > 0) token1.safeTransfer(msg.sender, uint256(amount1Delta));
 	}
 
 	// --- User functions --- //
@@ -194,12 +194,14 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 				vars.totalSupply
 			);
 
-		// ZapOut logic
+		// ZapOut logic Note test properly amounts
 		if (onlyToken0) {
-			(vars.amount0Delta, ) = _swap(amount1, false, slippageUserMax);
+			(vars.amount0Delta, vars.amount1Delta) = _swap(amount1, false, slippageUserMax);
 			amount0 = uint256(SafeCast.toInt256(amount0) - vars.amount0Delta);
+			amount1 = uint256(SafeCast.toInt256(amount1) - vars.amount1Delta);
 		} else if (onlyToken1) {
-			(, vars.amount1Delta) = _swap(amount0, true, slippageUserMax);
+			(vars.amount0Delta, vars.amount1Delta) = _swap(amount0, true, slippageUserMax);
+			amount0 = uint256(SafeCast.toInt256(amount0) - vars.amount0Delta);
 			amount1 = uint256(SafeCast.toInt256(amount1) - vars.amount1Delta);
 		}
 
