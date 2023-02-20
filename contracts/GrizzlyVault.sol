@@ -362,6 +362,28 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		return _getUnderlyingBalances(sqrtRatioX96, tick);
 	}
 
+	function estimateFees() external view returns (uint256 token0Fee, uint256 token1Fee) {
+		(, int24 currentTick, , , , , ) = pool.slot0();
+
+		Ticks memory ticks = baseTicks;
+
+		(
+			uint128 liquidity,
+			uint256 feeGrowthInside0Last,
+			uint256 feeGrowthInside1Last,
+			uint128 tokensOwed0,
+			uint128 tokensOwed1
+		) = pool.positions(_getPositionID(ticks));
+
+		// Compute current fees earned
+		token0Fee =
+			_computeFeesEarned(true, feeGrowthInside0Last, currentTick, liquidity, ticks) +
+			tokensOwed0;
+		token1Fee =
+			_computeFeesEarned(false, feeGrowthInside1Last, currentTick, liquidity, ticks) +
+			tokensOwed1;
+	}
+
 	// --- Internal core functions --- //
 
 	function _rebalance(uint128 liquidity, Ticks memory ticks) internal {
@@ -534,9 +556,9 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		(amount0Current, amount1Current) = _amountsForLiquidity(liquidity, ticks, sqrtRatioX96);
 
 		// Compute current fees earned
-		uint256 fee0 = _computeFeesEarned(true, feeGrowthInside0Last, tick, liquidity) +
+		uint256 fee0 = _computeFeesEarned(true, feeGrowthInside0Last, tick, liquidity, ticks) +
 			uint256(tokensOwed0);
-		uint256 fee1 = _computeFeesEarned(false, feeGrowthInside1Last, tick, liquidity) +
+		uint256 fee1 = _computeFeesEarned(false, feeGrowthInside1Last, tick, liquidity, ticks) +
 			uint256(tokensOwed1);
 
 		fee0 = (fee0 * (basisOne - managerFeeBPS)) / basisOne;
@@ -624,13 +646,12 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		bool isZero,
 		uint256 feeGrowthInsideLast,
 		int24 tick,
-		uint128 liquidity
+		uint128 liquidity,
+		Ticks memory ticks
 	) internal view returns (uint256 fee) {
 		uint256 feeGrowthOutsideLower;
 		uint256 feeGrowthOutsideUpper;
 		uint256 feeGrowthGlobal;
-
-		Ticks memory ticks = baseTicks;
 
 		if (isZero) {
 			feeGrowthGlobal = pool.feeGrowthGlobal0X128();
