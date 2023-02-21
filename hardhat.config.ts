@@ -58,6 +58,12 @@ const config: HardhatUserConfig = {
       allowUnlimitedContractSize: true,
       timeout: 1000 * 60,
     },
+    hardhat: {
+      forking: {
+        url: `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_ID}`,
+        blockNumber: 16678850,
+      },
+    },
   },
 
   solidity: {
