@@ -8,6 +8,7 @@ import "@typechain/hardhat";
 import "hardhat-deploy";
 import "solidity-coverage";
 import "hardhat-contract-sizer";
+import "hardhat-tracer";
 import "./lib/uniswap";
 
 // Process Env Variables
@@ -22,9 +23,8 @@ const config: HardhatUserConfig = {
 
   // hardhat-deploy
   namedAccounts: {
-    deployer: {
-      default: 0,
-    },
+    deployer: 0,
+    manager: 1,
   },
 
   etherscan: {
@@ -36,16 +36,6 @@ const config: HardhatUserConfig = {
       accounts: DEPLOYER_PK_MAINNET ? [DEPLOYER_PK_MAINNET] : [],
       chainId: 1,
       url: `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_ID}`,
-    },
-    polygon: {
-      accounts: DEPLOYER_PK_MAINNET ? [DEPLOYER_PK_MAINNET] : [],
-      chainId: 137,
-      url: `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_ID}`,
-    },
-    optimism: {
-      accounts: DEPLOYER_PK_MAINNET ? [DEPLOYER_PK_MAINNET] : [],
-      chainId: 10,
-      url: `https://opt-mainnet.g.alchemy.com/v2/${ALCHEMY_ID}`,
     },
     goerli: {
       accounts: DEPLOYER_PK ? [DEPLOYER_PK] : [],
@@ -60,7 +50,7 @@ const config: HardhatUserConfig = {
     },
     hardhat: {
       forking: {
-        url: `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_ID}`,
+        url: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_ID}`,
         blockNumber: 16678850,
       },
     },
@@ -88,12 +78,12 @@ const config: HardhatUserConfig = {
     target: "ethers-v5",
   },
 
-  contractSizer: {
-    alphaSort: true,
-    disambiguatePaths: false,
-    runOnCompile: true,
-    strict: true,
-  },
+  // contractSizer: {
+  //   alphaSort: true,
+  //   disambiguatePaths: false,
+  //   runOnCompile: true,
+  //   strict: true,
+  // },
 };
 
 export default config;
