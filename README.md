@@ -17,7 +17,7 @@ The position bounds are static by default, but can be updated by vault manager v
             uint256 amount0,
             uint256 amount1,
             uint128 liquidityMinted
-        )
+        ) {
 ```
 
 Arguments:
@@ -48,7 +48,7 @@ Note: to find out the amount of token0 and token1 you would owe by minting that 
 			uint256 amount0,
 			uint256 amount1,
 			uint128 liquidityBurned
-		)
+		) {
 ```
 
 Arguments:
@@ -74,7 +74,7 @@ Returns:
             uint256 amount0,
             uint256 amount1,
             uint256 mintAmount
-        )
+        ) {
 ```
 
 Arguments:
@@ -141,10 +141,11 @@ Arguments:
 
 ## GrizzlyVaultFactory Overview
 
-### ZapIn
+### cloneGrizzlyVault
 
-Basic zap that allows to deposit in the vault with one of the underlying pool tokens.
-ZapContract balances properly the amounts in order to maximize the liquidity provision.
+Every clone is a 100% replica of the Vault instance but serving for different variables.
+The proxy factory pattern helps us to deploy a bunch of immutable Vault clones with a considerably lower gas cost.
+These clones have the exact same logic as the implementation contract but with its own storage state.
 
 ```JavaScript
 	function cloneGrizzlyVault(
