@@ -16,7 +16,7 @@ async function main() {
   await grizzlyVaultFactory.deployed();
   console.log("GrizzlyVaultFactory deployed to:", grizzlyVaultFactory.address);
 
-  if (network.config.chainId === 1 && process.env.ETHERSCAN_API) {
+  if (network.config.chainId === 5 && process.env.ETHERSCAN_API_KEY) {
     console.log("Waiting for block confirmations...");
     await grizzlyVaultFactory.deployTransaction.wait(5);
     await verify(grizzlyVaultFactory.address, deployArgs);
