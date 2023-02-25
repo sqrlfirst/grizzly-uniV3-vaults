@@ -17,7 +17,7 @@ async function main() {
     )}`
   );
 
-  console.log("gasPrice: ", await ethers.provider.getGasPrice());
+  console.log("gasPrice: ", (await ethers.provider.getGasPrice()).toNumber());
 
   // Deploy contracts
   const grizzlyVaultFactory = await ethers.getContractFactory("GrizzlyVault");
@@ -27,7 +27,7 @@ async function main() {
   const zapContract = await deploy(zapContractFactory, "ZapContract");
 
   // Verification
-  if (network.config.chainId === 5 && process.env.ETHERSCAN_API) {
+  if (network.config.chainId === 5 && process.env.ETHERSCAN_API_KEY) {
     console.log("Waiting for block confirmations...");
     await zapContract.deployTransaction.wait(5);
     await verify(grizzlyVault.address, []);
