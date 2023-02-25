@@ -4,6 +4,7 @@ pragma solidity 0.8.4;
 
 import { OwnableUninitialized } from "./OwnableUninitialized.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import { IUniswapV3TickSpacing } from "../interfaces/IUniswapV3TickSpacing.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
@@ -56,9 +57,9 @@ abstract contract GrizzlyVaultStorage is
 		_;
 	}
 
-	/// @notice Initialize storage variables on a new G-UNI pool, only called once
-	/// @param _name Name of G-UNI token
-	/// @param _symbol Symbol of G-UNI token
+	/// @notice Initialize storage variables on a new Grizzly vault pool, only called once
+	/// @param _name Name of Grizzly vault token
+	/// @param _symbol Symbol of Grizzly vault token
 	/// @param _pool Address of Uniswap V3 pool
 	/// @param _managerFeeBPS Proportion of fees earned that go to manager treasury
 	/// Note that the 4 above params are NOT UPDATABLE AFTER INITIALIZATION
@@ -75,6 +76,8 @@ abstract contract GrizzlyVaultStorage is
 		address _manager_
 	) external override initializer {
 		require(_managerFeeBPS <= 10000, "bps");
+
+		_validateTickSpacing(_pool, _lowerTick, _upperTick);
 
 		// These variables are immutable after initialization
 		pool = IUniswapV3Pool(_pool);
@@ -145,5 +148,14 @@ abstract contract GrizzlyVaultStorage is
 		require(_slippageUserMax <= basisOne && _slippageRebalanceMax <= basisOne, "wrong inputs");
 		slippageUserMax = _slippageUserMax;
 		slippageRebalanceMax = _slippageRebalanceMax;
+	}
+
+	function _validateTickSpacing(
+		address uniPool,
+		int24 lowerTick,
+		int24 upperTick
+	) internal view returns (bool) {
+		int24 spacing = IUniswapV3TickSpacing(uniPool).tickSpacing();
+		return lowerTick < upperTick && lowerTick % spacing == 0 && upperTick % spacing == 0;
 	}
 }
