@@ -1,15 +1,15 @@
-[![CircleCI](https://circleci.com/gh/gelatodigital/g-uni-v1-core/tree/master.svg?style=svg&circle-token=0a89a0c369a448314a37b2f2312cc1a3e5d3d4e8)](https://circleci.com/gh/gelatodigital/g-uni-v1-core/tree/master)
-[![Coverage Status](https://coveralls.io/repos/github/gelatodigital/uni-v3-lp/badge.svg?branch=master&t=IlcAEC)](https://coveralls.io/github/gelatodigital/uni-v3-lp?branch=master)
+# Grizzly UniV3 Vaults
 
-# G-UNI v1 Core
+![](./images/bear.png)
 
-A shared fungible (ERC20) position for Uniswap V3 passive liquidity providers. G-UNI pools are auto-compounded by gelato network to reinvest accrued fees into the position. The position bounds are static and immutable by default, unless creating a "managed" pool, in which case an `executiveRebalance` can be performed by the governance/manager account which will redeposit liquidity into a new range (see [docs](https://docs-g-uni.gelato.network) for more info).
+A shared fungible (ERC20) position for Uniswap V3 passive liquidity providers. Grizzly Vaults are auto-compounded to reinvest accrued fees into the position.
+The position bounds are static by default, but can be updated by vault manager via `executiveRebalance` which redeposits liquidity into a new range.
 
-## G-UNI Pool Overview
+## Grizzly Vaults Overview
 
-### mint
+### Mint
 
-```
+```JavaScript
     function mint(uint256 mintAmount, address receiver)
         external
         nonReentrant
@@ -22,44 +22,51 @@ A shared fungible (ERC20) position for Uniswap V3 passive liquidity providers. G
 
 Arguments:
 
-- `mintAmount` amount of G-UNI tokens to mint
-- `receiver` account that receives the G-UNI tokens
+- `mintAmount` amount of Grizzly vault tokens to mint
+- `receiver` account that receives the Grizzly vault tokens
 
 Returns:
 
-- `amount0` amount of token0 actually deposited into G-UNI
-- `amount1` amount of token1 actually deposited into G-UNI
-- `liquidityMinted` amount of liqudiity added to G-UNI position
+- `amount0` amount of token0 actually deposited into Grizzly vault
+- `amount1` amount of token1 actually deposited into Grizzly vault
+- `liquidityMinted` amount of liquidity added to Grizzly vault position
 
-Note: to find out the amount of token0 and token1 you would owe by minting that many G-UNI tokens use getMintAmounts method.
+Note: to find out the amount of token0 and token1 you would owe by minting that many Grizzly vault tokens use `getMintAmounts` view method.
 
-### burn
+### Burn
 
-```
-    function burn(uint256 _burnAmount, address _receiver)
-        external
-        nonReentrant
-        returns (
-            uint256 amount0,
-            uint256 amount1,
-            uint128 liquidityBurned
-        )
+```JavaScript
+	function burn(
+		uint256 burnAmount,
+		bool onlyToken0,
+		bool onlyToken1,
+		address receiver
+	)
+		external
+		nonReentrant
+		returns (
+			uint256 amount0,
+			uint256 amount1,
+			uint128 liquidityBurned
+		)
 ```
 
 Arguments:
 
-- `_burnAmount` number of G-UNI tokens to burn
-- `_receiver` account that receives the remitted token0 and token1
+- `_burnAmount` number of Grizzly vault tokens to burn
+- `onlyToken0` if true the user zaps out with only token0
+- `onlyToken1` if true the user zaps out with only token1
+- `receiver` account that receives the remitted token0 and token1
 
 Returns:
 
-- `amount0` amount of token0 remitted to \_receiver
-- `amount1` amount of token1 remitted to \_receiver
-- `liquidityBurned` amount of liquidity burned from G-UNI positon
+- `amount0` amount of token0 remitted to receiver
+- `amount1` amount of token1 remitted to receiver
+- `liquidityBurned` amount of liquidity burned from Grizzly vault position
 
 ### getMintAmounts (view call)
 
-```
+```JavaScript
     function getMintAmounts(uint256 amount0Max, uint256 amount1Max)
         external
         view
@@ -72,59 +79,97 @@ Returns:
 
 Arguments:
 
-- `amount0Max` maximum amount of token0 to deposit into G-UNI
-- `amount1Max` maximum amount of token1 to deposit into G-UNI
+- `amount0Max` maximum amount of token0 to deposit into Grizzly vault
+- `amount1Max` maximum amount of token1 to deposit into Grizzly vault
 
 Returns:
 
-- `amount0` actual amount of token0 to deposit into G-UNI
-- `amount1` actual amount of token1 to deposit into G-UNI
-- `mintAmount` amount of G-UNI tokens to pass to mint function (will cost exactly `amount0` and `amount1`)
+- `amount0` actual amount of token0 to deposit into Grizzly vault
+- `amount1` actual amount of token1 to deposit into Grizzly vault
+- `mintAmount` amount of Grizzly vault tokens to pass to mint function (will cost exactly `amount0` and `amount1`)
 
-### rebalance
+### Rebalance
 
 ```
-    function rebalance(
-        uint160 _swapThresholdPrice,
-        uint256 _swapAmountBPS,
-        uint256 _feeAmount,
-        address _paymentToken
-    ) external gelatofy(_feeAmount, _paymentToken) {
+function rebalance() external onlyAuthorized
 ```
 
-Arguments:
+Note: Reinvest fees earned into underlying position, only authorized executors can call.
 
-- `_swapThresholdPrice` a sqrtPriceX96 which is used as the slippage parameter in uniswap v3 swaps.
-- `_swapAmountBPS` amount to swap passed as basis points of current amount of leftover token held (e.g. "swap 50% of balance" would be a value of 5000)
-- `_feeAmount` amount that gelato will take as a fee (`GelatoDiamond` checks against gas consumption so bot is not allowed to overcharge)
-- `_paymentToken` the token in which `_feeAmount` is collected
-
-Note: This method can only be called by gelato executors
-
-### executiveRebalance (for managed pools)
+### ExecutiveRebalance (for managed pools)
 
 If governance/admin wants to change bounds of the underlying position, or wants to force a rebalance for any other reason, they are allowed to call this executive rebalance function.
 
-```
-    function executiveRebalance(
-        int24 _newLowerTick,
-        int24 _newUpperTick,
-        uint160 _swapThresholdPrice,
-        uint256 _swapAmountBPS,
-        bool _zeroForOne
-    ) external onlyOwner {
+```JavaScript
+	function executiveRebalance(
+		int24 newLowerTick,
+		int24 newUpperTick,
+		uint128 minLiquidity
+	) external onlyManager {
 ```
 
 Arguments:
 
-- `_newLowerTick` the tick to use as position lower bound on reinvestment
-- `_newUpperTick` the tick to use as position upper bound on reinvestment
-- `_swapThresholdPrice` a sqrtPriceX96 which is used as the slippage parameter in uniswap v3 swaps.
-- `_swapAmountBPS` amount to swap passed as basis points of current amount of leftover token held (e.g. "swap 50% of balance" would be a value of 5000)
-- `_zeroForOne` which token to input into the swap (true = token0, false = token1)
+- `newLowerTick` the tick to use as position lower bound on reinvestment
+- `newUpperTick` the tick to use as position upper bound on reinvestment
+- `minLiquidity` minimum liquidity of the new position in order to not revert
 
-# test
+## ZapContract Overview
 
-yarn
+### ZapIn
 
+Basic zap that allows to deposit in the vault with one of the underlying pool tokens.
+ZapContract balances properly the amounts in order to maximize the liquidity provision.
+
+```JavaScript
+    function zapIn(
+    	address pool,
+    	address vault,
+    	uint256 amount0Desired,
+    	uint256 amount1Desired,
+    	uint256 maxSwapSlippage
+    ) external {
+```
+
+Arguments:
+
+- `pool` the desired UniV3 pool to zapIn
+- `vault` the Grizzly vault chosen to deposit the tokens
+- `amount0Desired` amount of token0 the user wants to invest into the vault
+- `amount1Desired` amount of token1 the user wants to invest into the vault
+- `maxSwapSlippage` maxSlippage allowed for the underlying swap
+
+## GrizzlyVaultFactory Overview
+
+### ZapIn
+
+Basic zap that allows to deposit in the vault with one of the underlying pool tokens.
+ZapContract balances properly the amounts in order to maximize the liquidity provision.
+
+```JavaScript
+	function cloneGrizzlyVault(
+		address tokenA,
+		address tokenB,
+		uint24 uniFee,
+		uint16 managerFee,
+		int24 lowerTick,
+		int24 upperTick,
+		address manager
+	) external override returns (address newVault) {
+```
+
+Arguments:
+
+- `tokenA` one of the tokens in the uniswap pair
+- `tokenB` the other token in the uniswap pair
+- `uniFee` fee tier of the uniswap pair
+- `managerFee` proportion of earned fees that go to pool manager in bps
+- `lowerTick` initial lower bound of the Uniswap V3 position
+- `upperTick` initial upper bound of the Uniswap V3 position
+- `manager` address of the manager of the new Vault
+
+# Test
+
+```
 yarn test
+```

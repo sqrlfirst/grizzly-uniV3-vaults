@@ -72,6 +72,7 @@ contract GrizzlyVaultFactory is IGrizzlyVaultFactory, Ownable {
 	/// @param managerFee Proportion of earned fees that go to pool manager in Basis Points
 	/// @param lowerTick Initial lower bound of the Uniswap V3 position
 	/// @param upperTick Initial upper bound of the Uniswap V3 position
+	/// @param manager Address of the manager of the new Vault
 	/// @return newVault Address of the newly created Grizzly Vault (proxy)
 	function cloneGrizzlyVault(
 		address tokenA,
