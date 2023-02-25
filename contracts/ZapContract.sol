@@ -179,23 +179,23 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 	/// @notice maxSwapSlippage variable as argument to have flexibility with different liquidity pools
 	function _swap(
 		address pool,
-		uint256 _amountIn,
-		bool _zeroForOne,
-		uint256 _maxSwapSlippage,
+		uint256 amountIn,
+		bool zeroForOne,
+		uint256 maxSwapSlippage,
 		bytes memory data
 	) internal returns (int256, int256) {
-		// If the _maxSwapSlippage argument is not provided we use default slippageUserMax state variable
-		uint256 _slippageMax = _maxSwapSlippage == 0 ? slippageUserMax : _maxSwapSlippage;
+		// If the maxSwapSlippage argument is not provided we use default slippageUserMax state variable
+		uint256 _slippageMax = maxSwapSlippage == 0 ? slippageUserMax : maxSwapSlippage;
 
-		(uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
-		uint256 slippage = _zeroForOne ? (basisOne - _slippageMax) : (basisOne + _slippageMax);
+		(uint160 _sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
+		uint256 _slippage = zeroForOne ? (basisOne - _slippageMax) : (basisOne + _slippageMax);
 
 		return
 			IUniswapV3Pool(pool).swap(
 				address(this),
-				_zeroForOne, // Swap direction, true: token0 -> token1, false: token1 -> token0
-				int256(_amountIn),
-				uint160(uint256((sqrtPriceX96 * slippage) / basisOne)), // sqrtPriceLimitX96
+				zeroForOne, // Swap direction, true: token0 -> token1, false: token1 -> token0
+				int256(amountIn),
+				uint160(uint256((_sqrtPriceX96 * _slippage) / basisOne)), // sqrtPriceLimitX96
 				data
 			);
 	}
@@ -221,33 +221,33 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 
 	/// @notice Computes the token0 and token1 value for a given amount of liquidity
 	function _amountsForLiquidity(
-		uint128 _liquidity,
-		IGrizzlyVault.Ticks memory _ticks,
-		uint160 _sqrtRatioX96
+		uint128 liquidity,
+		IGrizzlyVault.Ticks memory ticks,
+		uint160 sqrtRatioX96
 	) internal view returns (uint256, uint256) {
 		return
 			LiquidityAmounts.getAmountsForLiquidity(
-				_sqrtRatioX96,
-				_ticks.lowerTick.getSqrtRatioAtTick(),
-				_ticks.upperTick.getSqrtRatioAtTick(),
-				_liquidity
+				sqrtRatioX96,
+				ticks.lowerTick.getSqrtRatioAtTick(),
+				ticks.upperTick.getSqrtRatioAtTick(),
+				liquidity
 			);
 	}
 
 	/// @notice Gets the liquidity for the available amounts of token0 and token1
 	function _liquidityForAmounts(
-		IGrizzlyVault.Ticks memory _ticks,
-		uint160 _sqrtRatioX96,
-		uint256 _amount0,
-		uint256 _amount1
+		IGrizzlyVault.Ticks memory ticks,
+		uint160 sqrtRatioX96,
+		uint256 amount0,
+		uint256 amount1
 	) internal view returns (uint128) {
 		return
 			LiquidityAmounts.getLiquidityForAmounts(
-				_sqrtRatioX96,
-				_ticks.lowerTick.getSqrtRatioAtTick(),
-				_ticks.upperTick.getSqrtRatioAtTick(),
-				_amount0,
-				_amount1
+				sqrtRatioX96,
+				ticks.lowerTick.getSqrtRatioAtTick(),
+				ticks.upperTick.getSqrtRatioAtTick(),
+				amount0,
+				amount1
 			);
 	}
 
