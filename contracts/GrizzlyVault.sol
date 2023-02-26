@@ -255,7 +255,7 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 				reinvest1
 			);
 
-			_addLiquidity(ticks, finalAmount0, finalAmount1);
+			_addLiquidity(newTicks, finalAmount0, finalAmount1);
 
 			(newLiquidity, , , , ) = pool.positions(_getPositionID(newTicks));
 			require(newLiquidity > minLiquidity, "min liquidity");
@@ -394,13 +394,9 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		uint256 leftover0 = token0.balanceOf(address(this)) - managerBalance0;
 		uint256 leftover1 = token1.balanceOf(address(this)) - managerBalance1;
 
-		(uint256 finalAmount0, uint256 finalAmount1) = _balanceAmounts(
-			ticks,
-			leftover0,
-			leftover1
-		);
-
-		_addLiquidity(ticks, finalAmount0, finalAmount1);
+		// Note if we balance amounts in _rebalance it can underflow
+		// Note check how precise is adding liquidity maintaining the ticks
+		_addLiquidity(ticks, leftover0, leftover1);
 	}
 
 	function _withdraw(Ticks memory ticks, uint128 liquidity)
@@ -454,10 +450,10 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 			_zeroForOne = _amountsDirection(amount0Desired, amount1Desired, amount0, amount1);
 		}
 
-		// Determine the amount to swap
+		// Determine the amount to swap, it is not 100% precise but is a very good approximation
 		uint256 _amountSpecified = _zeroForOne
-			? (amount0Desired - (((amount0 * (basisOne + uniPoolFee / 2)) / basisOne) / 2))
-			: (amount1Desired - (((amount1 * (basisOne + uniPoolFee / 2)) / basisOne) / 2));
+			? (amount0Desired - (((amount0 * (basisOne + uniPoolFee / 2)) / basisOne))) / 2
+			: (amount1Desired - (((amount1 * (basisOne + uniPoolFee / 2)) / basisOne))) / 2;
 
 		if (_amountSpecified > 0) {
 			(int256 amount0Delta, int256 amount1Delta) = _swap(
@@ -465,8 +461,8 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 				_zeroForOne,
 				slippageRebalanceMax
 			);
-			finalAmount0 = uint256(SafeCast.toInt256(amount0) - amount0Delta);
-			finalAmount1 = uint256(SafeCast.toInt256(amount1) - amount1Delta);
+			finalAmount0 = uint256(SafeCast.toInt256(amount0Desired) - amount0Delta);
+			finalAmount1 = uint256(SafeCast.toInt256(amount1Desired) - amount1Delta);
 		} else {
 			return (amount0, amount1);
 		}

@@ -109,7 +109,7 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 
 		// Approvals
 		vars.token0.safeIncreaseAllowance(vault, finalAmount0);
-		vars.token0.safeIncreaseAllowance(vault, finalAmount1);
+		vars.token1.safeIncreaseAllowance(vault, finalAmount1);
 
 		IGrizzlyVault(vault).mint(mintAmount, msg.sender);
 
@@ -158,8 +158,8 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 
 		// Determine the amount to swap, it is not 100% precise but is a very good approximation
 		uint256 _amountSpecified = _zeroForOne
-			? (amount0Desired - (((amount0 * (basisOne + vars.uniPoolFee / 2)) / basisOne) / 2))
-			: (amount1Desired - (((amount1 * (basisOne + vars.uniPoolFee / 2)) / basisOne) / 2));
+			? (amount0Desired - (((amount0 * (basisOne + vars.uniPoolFee / 2)) / basisOne))) / 2
+			: (amount1Desired - (((amount1 * (basisOne + vars.uniPoolFee / 2)) / basisOne))) / 2;
 
 		if (_amountSpecified > 0) {
 			(vars.amount0Delta, vars.amount1Delta) = _swap(
@@ -169,8 +169,8 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 				maxSwapSlippage,
 				data
 			);
-			finalAmount0 = uint256(SafeCast.toInt256(amount0) - vars.amount0Delta);
-			finalAmount1 = uint256(SafeCast.toInt256(amount1) - vars.amount1Delta);
+			finalAmount0 = uint256(SafeCast.toInt256(amount0Desired) - vars.amount0Delta);
+			finalAmount1 = uint256(SafeCast.toInt256(amount1Desired) - vars.amount1Delta);
 		} else {
 			return (amount0, amount1);
 		}
