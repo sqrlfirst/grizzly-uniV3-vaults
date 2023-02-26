@@ -7,7 +7,7 @@ import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3
 import { IGrizzlyVault } from "./interfaces/IGrizzlyVault.sol";
 import { TickMath } from "./uniswap/TickMath.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import { SignedMath } from "@openzeppelin/contracts/utils/math/SignedMath.sol";
 import { LiquidityAmounts } from "./uniswap/LiquidityAmounts.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -39,10 +39,10 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 	string public constant name = "GrizzlyVaultZapContract";
 	string public constant version = "1.0.0";
 
-	uint256 internal constant basisOne = 10000;
+	uint256 internal constant basisOne = 1000000;
 
-	// In bps, how much slippage we allow between swaps -> 50 = 0.5% slippage
-	uint256 public slippageUserMax = 50;
+	// In bps, how much slippage we allow between swaps -> 5000 = 0.5% slippage
+	uint256 public slippageUserMax = 5000;
 
 	event ZapInVault(address sender, address vault, uint256 shares);
 
@@ -158,8 +158,8 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 
 		// Determine the amount to swap, it is not 100% precise but is a very good approximation
 		uint256 _amountSpecified = _zeroForOne
-			? (amount0Desired - (((amount0 * (basisOne + vars.uniPoolFee / 2)) / basisOne))) / 2
-			: (amount1Desired - (((amount1 * (basisOne + vars.uniPoolFee / 2)) / basisOne))) / 2;
+			? ((amount0Desired - amount0) * basisOne) / (2 * basisOne + vars.uniPoolFee)
+			: ((amount1Desired - amount1) * basisOne) / (2 * basisOne + vars.uniPoolFee);
 
 		if (_amountSpecified > 0) {
 			(vars.amount0Delta, vars.amount1Delta) = _swap(
@@ -200,11 +200,7 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 			);
 	}
 
-	function _transferUserLeftAmounts(
-		IERC20 token0,
-		IERC20 token1,
-		address receiver
-	) internal {
+	function _transferUserLeftAmounts(IERC20 token0, IERC20 token1, address receiver) internal {
 		uint256 token0Balance = token0.balanceOf(address(this));
 		uint256 token1Balance = token1.balanceOf(address(this));
 
