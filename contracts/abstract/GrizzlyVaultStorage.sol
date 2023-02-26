@@ -141,10 +141,10 @@ abstract contract GrizzlyVaultStorage is
 		keeperAddress = _keeperAddress;
 	}
 
-	function setManagerParams(uint256 _slippageUserMax, uint256 _slippageRebalanceMax)
-		external
-		onlyManager
-	{
+	function setManagerParams(
+		uint256 _slippageUserMax,
+		uint256 _slippageRebalanceMax
+	) external onlyManager {
 		require(_slippageUserMax <= basisOne && _slippageRebalanceMax <= basisOne, "wrong inputs");
 		slippageUserMax = _slippageUserMax;
 		slippageRebalanceMax = _slippageRebalanceMax;
