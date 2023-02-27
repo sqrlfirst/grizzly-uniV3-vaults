@@ -89,25 +89,6 @@ describe("ZapContract", () => {
     }
   });
 
-  // describe("Creates a pool", () => {
-  //   it("Should correctly clone a pool ", async () => {
-  //     expect(await grizzlyFactory.numVaults(deployerGrizzly)).to.be.eq(
-  //       BigNumber.from(0)
-  //     );
-  //     await grizzlyFactory.cloneGrizzlyVault(
-  //       token0.address,
-  //       token1.address,
-  //       3000,
-  //       0,
-  //       -887220,
-  //       887220,
-  //       manager
-  //     );
-  //     expect(await grizzlyFactory.numVaults(deployerGrizzly)).to.be.eq(
-  //       BigNumber.from(1)
-  //     );
-  //   });
-  // });
   describe("ZapIn in a balanced small pool", () => {
     beforeEach(async () => {
       // We create a UniswapV3 pool with the mock tokens
