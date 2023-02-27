@@ -1,3 +1,215 @@
+import { expect } from "chai";
+import bn from "bignumber.js";
+import { BigNumber, BigNumberish } from "ethers";
+import { ethers, deployments, getNamedAccounts } from "hardhat";
+import {
+  IERC20,
+  IUniswapV3Factory,
+  IUniswapV3Pool,
+  GrizzlyVault,
+  GrizzlyVaultFactory,
+  ZapContract,
+} from "../typechain";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+
+bn.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
+
+// returns the sqrt price as a 64x96
+export function encodePriceSqrt(
+  reserve1: BigNumberish,
+  reserve0: BigNumberish
+): BigNumber {
+  return BigNumber.from(
+    new bn(reserve1.toString())
+      .div(reserve0.toString())
+      .sqrt()
+      .multipliedBy(new bn(2).pow(96))
+      .integerValue(3)
+      .toString()
+  );
+}
+
+describe("Grizzly Vault Contracts", () => {
+  const UNISWAP_ADDRESS = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
+  let uniswapFactory: IUniswapV3Factory;
+  let uniswapPool: IUniswapV3Pool;
+
+  let token0: IERC20;
+  let token1: IERC20;
+  let grizzlyCoreVault: GrizzlyVault;
+  let grizzlyVault: GrizzlyVault;
+  let grizzlyFactory: GrizzlyVaultFactory;
+
+  let uniswapPoolAddress: string;
+  let vaultAddress: string;
+
+  let user: SignerWithAddress;
+  let deployerGrizzly: string;
+  let manager: string;
+
+  before(async () => {
+    const accounts = await getNamedAccounts();
+    deployerGrizzly = accounts.deployer;
+    manager = accounts.manager;
+    user = (await ethers.getSigners())[2];
+  });
+
+  beforeEach(async () => {
+    // We connect to Uniswap v3 on Mainnet
+    uniswapFactory = (await ethers.getContractAt(
+      "IUniswapV3Factory",
+      UNISWAP_ADDRESS
+    )) as IUniswapV3Factory;
+
+    // We load the deployment fixtures of hardhat-deploy
+    await deployments.fixture(["local"]);
+    grizzlyCoreVault = await ethers.getContract(
+      "GrizzlyVault",
+      deployerGrizzly
+    );
+    grizzlyFactory = await ethers.getContract(
+      "GrizzlyVaultFactory",
+      deployerGrizzly
+    );
+
+    token0 = await ethers.getContract("Token0", deployerGrizzly);
+    token1 = await ethers.getContract("Token1", deployerGrizzly);
+
+    // We charge user account with some tokens
+    token0.transfer(user.address, ethers.utils.parseEther("10"));
+    token1.transfer(user.address, ethers.utils.parseEther("10"));
+
+    // Sort token0 & token1 so it follows the same order as Uniswap & the GrizzlyVaultFactory
+    if (BigNumber.from(token0.address).gt(BigNumber.from(token1.address))) {
+      const tmp = token0;
+      token0 = token1;
+      token1 = tmp;
+    }
+
+    // We create a UniswapV3 pool with the mock tokens
+    await uniswapFactory.createPool(token0.address, token1.address, "3000");
+    uniswapPoolAddress = await uniswapFactory.getPool(
+      token0.address,
+      token1.address,
+      "3000" // 0.3%
+    );
+
+    uniswapPool = (await ethers.getContractAt(
+      "IUniswapV3Pool",
+      uniswapPoolAddress
+    )) as IUniswapV3Pool;
+
+    await uniswapPool.initialize(encodePriceSqrt("1", "1"));
+    await uniswapPool.increaseObservationCardinalityNext("5");
+
+    // We create a Grizzly vault
+    await grizzlyFactory.cloneGrizzlyVault(
+      token0.address,
+      token1.address,
+      3000,
+      0,
+      -887220,
+      887220,
+      manager
+    );
+
+    vaultAddress = (await grizzlyFactory.getVaults(deployerGrizzly))[0];
+
+    grizzlyVault = await ethers.getContractAt("GrizzlyVault", vaultAddress);
+  });
+
+  describe("Grizzly Vault Factory", () => {
+    describe("Clone Grizzly Vault", () => {
+      describe("Reverts with wrong parameters", () => {
+        it("Should revert when pool does not exist", () => {
+          expect(
+            grizzlyFactory.cloneGrizzlyVault(
+              token0.address,
+              token1.address,
+              10000,
+              0,
+              -887220,
+              887220,
+              manager
+            )
+          ).to.be.revertedWith("uniV3Pool does not exist");
+        });
+
+        it("Should revert when pool tickspace is not correct", () => {
+          expect(
+            grizzlyFactory.cloneGrizzlyVault(
+              token0.address,
+              token1.address,
+              3000,
+              0,
+              -88722,
+              887220,
+              manager
+            )
+          ).to.be.revertedWith("tickSpacing mismatch");
+        });
+      });
+
+      describe("Clones a Grizzly Vault", () => {
+        it("Should correctly clone a vaut", async () => {
+          expect(await grizzlyFactory.numVaults(deployerGrizzly)).to.be.eq(
+            BigNumber.from(1)
+          );
+          await grizzlyFactory.cloneGrizzlyVault(
+            token0.address,
+            token1.address,
+            3000,
+            0,
+            -887220,
+            887220,
+            manager
+          );
+          expect(await grizzlyFactory.numVaults(deployerGrizzly)).to.be.eq(
+            BigNumber.from(2)
+          );
+        });
+      });
+    });
+
+    describe("Token name", () => {
+      it("Should get correct name", async () => {
+        const tokenName = await grizzlyFactory.getTokenName(
+          token0.address,
+          token1.address
+        );
+        expect(tokenName).to.be.eq("Grizzly Uniswap TOKEN0/TOKEN1 LP");
+      });
+    });
+
+    describe("Set implementation vault", () => {
+      it("Should revertwith 0 address", () => {
+        expect(
+          grizzlyFactory.setImplementationVault(ethers.constants.AddressZero)
+        ).to.be.revertedWith("zeroAddress");
+      });
+
+      it("Should set new implementation vault correctly", async () => {
+        // Check old implementation
+        expect(await grizzlyFactory.implementation()).to.be.eq(
+          grizzlyCoreVault.address
+        );
+
+        // Change implementation
+        await expect(
+          grizzlyFactory.setImplementationVault(grizzlyVault.address)
+        )
+          .to.emit(grizzlyFactory, "ImplementationVaultChanged")
+          .withArgs(grizzlyVault.address, grizzlyCoreVault.address);
+
+        // Check new implementation
+        expect(await grizzlyFactory.implementation()).to.be.eq(
+          grizzlyVault.address
+        );
+      });
+    });
+  });
+});
+
 // import { expect } from "chai";
 // import { BigNumber } from "bignumber.js";
 // import { ethers, network } from "hardhat";
