@@ -11,6 +11,8 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { FullMath, LiquidityAmounts } from "./uniswap/LiquidityAmounts.sol";
 
+import "hardhat/console.sol";
+
 contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, GrizzlyVaultStorage {
 	using SafeERC20 for IERC20;
 	using TickMath for int24;
@@ -76,15 +78,10 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 	/// @return amount1 Amount of token1 transferred from msg.sender to mint `mintAmount`
 	/// @return liquidityMinted Amount of liquidity added to the underlying Uniswap V3 position
 	// solhint-disable-next-line function-max-lines, code-complexity
-	function mint(uint256 mintAmount, address receiver)
-		external
-		nonReentrant
-		returns (
-			uint256 amount0,
-			uint256 amount1,
-			uint128 liquidityMinted
-		)
-	{
+	function mint(
+		uint256 mintAmount,
+		address receiver
+	) external nonReentrant returns (uint256 amount0, uint256 amount1, uint128 liquidityMinted) {
 		require(mintAmount > 0, "mint 0");
 
 		uint256 totalSupply = totalSupply();
@@ -110,6 +107,8 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 				sqrtRatioX96
 			);
 		}
+		console.log("MINT AMOUNT", mintAmount);
+		console.log("AMOUNTS", amount0, amount1);
 
 		// Transfer amounts owed to contract
 		if (amount0 > 0) {
@@ -144,15 +143,7 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		bool onlyToken0,
 		bool onlyToken1,
 		address receiver
-	)
-		external
-		nonReentrant
-		returns (
-			uint256 amount0,
-			uint256 amount1,
-			uint128 liquidityBurned
-		)
-	{
+	) external nonReentrant returns (uint256 amount0, uint256 amount1, uint128 liquidityBurned) {
 		require(burnAmount > 0, "burn 0");
 
 		_validateValues(onlyToken0, onlyToken1);
@@ -311,15 +302,10 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 	/// @return amount0 Actual amount of token0 to forward when minting `mintAmount`
 	/// @return amount1 Actual amount of token1 to forward when minting `mintAmount`
 	/// @return mintAmount Maximum number of Grizzly Vault tokens to mint
-	function getMintAmounts(uint256 amount0Max, uint256 amount1Max)
-		external
-		view
-		returns (
-			uint256 amount0,
-			uint256 amount1,
-			uint256 mintAmount
-		)
-	{
+	function getMintAmounts(
+		uint256 amount0Max,
+		uint256 amount1Max
+	) external view returns (uint256 amount0, uint256 amount1, uint256 mintAmount) {
 		uint256 totalSupply = totalSupply();
 
 		if (totalSupply > 0) {
@@ -353,11 +339,9 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		return _getUnderlyingBalances(sqrtRatioX96, tick);
 	}
 
-	function getUnderlyingBalancesAtPrice(uint160 sqrtRatioX96)
-		external
-		view
-		returns (uint256 amount0Current, uint256 amount1Current)
-	{
+	function getUnderlyingBalancesAtPrice(
+		uint160 sqrtRatioX96
+	) external view returns (uint256 amount0Current, uint256 amount1Current) {
 		(, int24 tick, , , , , ) = pool.slot0();
 		return _getUnderlyingBalances(sqrtRatioX96, tick);
 	}
@@ -399,15 +383,10 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		_addLiquidity(ticks, leftover0, leftover1);
 	}
 
-	function _withdraw(Ticks memory ticks, uint128 liquidity)
-		internal
-		returns (
-			uint256 burn0,
-			uint256 burn1,
-			uint256 fee0,
-			uint256 fee1
-		)
-	{
+	function _withdraw(
+		Ticks memory ticks,
+		uint128 liquidity
+	) internal returns (uint256 burn0, uint256 burn1, uint256 fee0, uint256 fee1) {
 		uint256 preBalance0 = token0.balanceOf(address(this));
 		uint256 preBalance1 = token1.balanceOf(address(this));
 
@@ -468,11 +447,7 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		}
 	}
 
-	function _addLiquidity(
-		Ticks memory ticks,
-		uint256 amount0,
-		uint256 amount1
-	) internal {
+	function _addLiquidity(Ticks memory ticks, uint256 amount0, uint256 amount1) internal {
 		// As we have made a swap in the pool sqrtRatioX96 changes
 		(uint160 sqrtRatioX96, , , , , , ) = pool.slot0();
 
@@ -501,11 +476,7 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 			);
 	}
 
-	function _transferAmounts(
-		uint256 amount0,
-		uint256 amount1,
-		address receiver
-	) internal {
+	function _transferAmounts(uint256 amount0, uint256 amount1, address receiver) internal {
 		if (amount0 > 0) {
 			token0.safeTransfer(receiver, amount0);
 		}
@@ -515,10 +486,10 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		}
 	}
 
-	function _applyFees(uint256 rawFee0, uint256 rawFee1)
-		internal
-		returns (uint256 fee0, uint256 fee1)
-	{
+	function _applyFees(
+		uint256 rawFee0,
+		uint256 rawFee1
+	) internal returns (uint256 fee0, uint256 fee1) {
 		uint256 managerFee0 = (rawFee0 * managerFeeBPS) / basisOne;
 		uint256 managerFee1 = (rawFee1 * managerFeeBPS) / basisOne;
 
@@ -533,11 +504,10 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 
 	// --- Internal view functions --- //
 
-	function _getUnderlyingBalances(uint160 sqrtRatioX96, int24 tick)
-		internal
-		view
-		returns (uint256 amount0Current, uint256 amount1Current)
-	{
+	function _getUnderlyingBalances(
+		uint160 sqrtRatioX96,
+		int24 tick
+	) internal view returns (uint256 amount0Current, uint256 amount1Current) {
 		Ticks memory ticks = baseTicks;
 
 		(
@@ -605,15 +575,7 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		uint256 totalSupply,
 		uint256 amount0Max,
 		uint256 amount1Max
-	)
-		internal
-		view
-		returns (
-			uint256 amount0,
-			uint256 amount1,
-			uint256 mintAmount
-		)
-	{
+	) internal view returns (uint256 amount0, uint256 amount1, uint256 mintAmount) {
 		(uint256 amount0Current, uint256 amount1Current) = getUnderlyingBalances();
 
 		// Compute proportional amount of tokens to mint
