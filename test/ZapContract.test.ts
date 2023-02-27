@@ -87,37 +87,6 @@ describe("ZapContract", () => {
       token0 = token1;
       token1 = tmp;
     }
-
-    // We create a UniswapV3 pool with the mock tokens
-    await uniswapFactory.createPool(token0.address, token1.address, "3000");
-    uniswapPoolAddress = await uniswapFactory.getPool(
-      token0.address,
-      token1.address,
-      "3000" // 0.3%
-    );
-
-    uniswapPool = (await ethers.getContractAt(
-      "IUniswapV3Pool",
-      uniswapPoolAddress
-    )) as IUniswapV3Pool;
-
-    await uniswapPool.initialize(encodePriceSqrt("1", "1"));
-    await uniswapPool.increaseObservationCardinalityNext("5");
-
-    // We create a Grizzly vault
-    await grizzlyFactory.cloneGrizzlyVault(
-      token0.address,
-      token1.address,
-      3000,
-      0,
-      -887220,
-      887220,
-      manager
-    );
-
-    vaultAddress = (await grizzlyFactory.getVaults(deployerGrizzly))[0];
-
-    grizzlyVault = await ethers.getContractAt("GrizzlyVault", vaultAddress);
   });
 
   // describe("Creates a pool", () => {
@@ -139,415 +108,857 @@ describe("ZapContract", () => {
   //     );
   //   });
   // });
+  describe("ZapIn in a balanced small pool", () => {
+    beforeEach(async () => {
+      // We create a UniswapV3 pool with the mock tokens
+      await uniswapFactory.createPool(token0.address, token1.address, "3000");
+      uniswapPoolAddress = await uniswapFactory.getPool(
+        token0.address,
+        token1.address,
+        "3000" // 0.3%
+      );
 
-  describe("Reverts ZapIn when not correctly done", () => {
-    it("Should revert ZapIn when vault and pool do not correspond", async () => {
-      const amount0Desired = ethers.utils.parseEther("1");
-      const amount1Desired = ethers.utils.parseEther("0");
-      const maxSwapSlippage = BigNumber.from(10); // 0.1%
+      uniswapPool = (await ethers.getContractAt(
+        "IUniswapV3Pool",
+        uniswapPoolAddress
+      )) as IUniswapV3Pool;
 
-      expect(
-        zapContract.zapIn(
-          ethers.constants.AddressZero,
-          vaultAddress,
-          amount0Desired,
-          amount1Desired,
-          maxSwapSlippage
-        )
-      ).to.be.revertedWith("wrong pool");
+      await uniswapPool.initialize(encodePriceSqrt("1", "1"));
+      await uniswapPool.increaseObservationCardinalityNext("5");
+
+      // We create a Grizzly vault
+      await grizzlyFactory.cloneGrizzlyVault(
+        token0.address,
+        token1.address,
+        3000,
+        0,
+        -887220,
+        887220,
+        manager
+      );
+
+      vaultAddress = (await grizzlyFactory.getVaults(deployerGrizzly))[0];
+
+      grizzlyVault = await ethers.getContractAt("GrizzlyVault", vaultAddress);
     });
+    describe("Reverts ZapIn when not correctly done", () => {
+      it("Should revert ZapIn when vault and pool do not correspond", async () => {
+        const amount0Desired = ethers.utils.parseEther("1");
+        const amount1Desired = ethers.utils.parseEther("0");
+        const maxSwapSlippage = BigNumber.from(10); // 0.1%
 
-    it("Should revert ZapIn when token not approved", async () => {
-      const amount0Desired = ethers.utils.parseEther("1");
-      const amount1Desired = ethers.utils.parseEther("0");
-      const maxSwapSlippage = BigNumber.from(10); // 0.1%
+        expect(
+          zapContract.zapIn(
+            ethers.constants.AddressZero,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("wrong pool");
+      });
 
-      expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          amount0Desired,
-          amount1Desired,
-          maxSwapSlippage
-        )
-      ).to.be.revertedWith("ERC20: insufficient allowance");
+      it("Should revert ZapIn when token not approved", async () => {
+        const amount0Desired = ethers.utils.parseEther("1");
+        const amount1Desired = ethers.utils.parseEther("0");
+        const maxSwapSlippage = BigNumber.from(10); // 0.1%
+
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("ERC20: insufficient allowance");
+      });
+
+      it("Should revert ZapIn when pool has no funds", async () => {
+        const amount0Desired = ethers.utils.parseEther("1");
+        const amount1Desired = ethers.utils.parseEther("0");
+        const maxSwapSlippage = BigNumber.from(10); // 0.1%
+
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("mint 0");
+      });
     });
+    describe("Reverts ZapIn when using out of range values", () => {
+      beforeEach(async () => {
+        // Deployer loads the pool with some tokens
+        const amount0Max = ethers.utils.parseEther("100");
+        const amount1Max = ethers.utils.parseEther("100");
 
-    it("Should revert ZapIn when pool has no funds", async () => {
-      const amount0Desired = ethers.utils.parseEther("1");
-      const amount1Desired = ethers.utils.parseEther("0");
-      const maxSwapSlippage = BigNumber.from(10); // 0.1%
+        const amounts = await grizzlyVault.getMintAmounts(
+          amount0Max,
+          amount1Max
+        );
 
-      await token0.connect(user).approve(zapContract.address, amount0Desired);
+        token0.approve(grizzlyVault.address, amounts.amount0);
+        token1.approve(grizzlyVault.address, amounts.amount1);
 
-      expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          amount0Desired,
-          amount1Desired,
-          maxSwapSlippage
+        grizzlyVault.mint(amounts.mintAmount, deployerGrizzly);
+      });
+
+      it("Should revert ZapIn when not enough allowance", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("10");
+        const amount1Desired = ethers.utils.parseEther("10");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
+
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
+
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            ethers.utils.parseEther("11"),
+            amount1Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("ERC20: insufficient allowance");
+
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            ethers.utils.parseEther("11"),
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("ERC20: insufficient allowance");
+      });
+
+      it("Should revert ZapIn when price gets out of liquidity range", async () => {
+        // We charge user account with more tokens
+        token0.transfer(user.address, ethers.utils.parseEther("100"));
+        token1.transfer(user.address, ethers.utils.parseEther("100"));
+
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("100");
+        const amount1Desired = ethers.utils.parseEther("1");
+        const maxSwapSlippage = BigNumber.from(1000000); // 100%
+
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
+
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("SPL");
+
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount1Desired,
+            amount0Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("SPL");
+      });
+    });
+    describe("Correctly ZapIn with different amounts", () => {
+      beforeEach(async () => {
+        // Deployer loads the pool with some tokens
+        const amount0Max = ethers.utils.parseEther("100");
+        const amount1Max = ethers.utils.parseEther("100");
+
+        const amounts = await grizzlyVault.getMintAmounts(
+          amount0Max,
+          amount1Max
+        );
+
+        token0.approve(grizzlyVault.address, amounts.amount0);
+        token1.approve(grizzlyVault.address, amounts.amount1);
+
+        grizzlyVault.mint(amounts.mintAmount, deployerGrizzly);
+      });
+
+      it("Should ZapIn when user gives token0 = token 1 > 0", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("1");
+        const amount1Desired = ethers.utils.parseEther("1");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
+
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
+
+        const mintAmount = ethers.utils.parseEther("0.999999999999999999");
+
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
         )
-      ).to.be.revertedWith("mint 0");
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
+
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("9.000000000000000001")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("9.000000000000000001")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
+
+      it("Should ZapIn when user gives token0 > 0 = token1", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("1");
+        const amount1Desired = ethers.utils.parseEther("0");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
+
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+
+        const mintAmount = ethers.utils.parseEther("0.496770988574267262");
+
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        )
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
+
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("9.001497753369945084")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("10.000977515753211757")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
+
+      it("Should ZapIn when user gives token1 > 0 = token0", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("0");
+        const amount1Desired = ethers.utils.parseEther("1");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
+
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
+
+        const mintAmount = ethers.utils.parseEther("0.496770988574267262");
+
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        )
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
+
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("10.000977515753211757")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("9.001497753369945084")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
+
+      it("Should ZapIn when user gives token0 > token1 > 0", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("2");
+        const amount1Desired = ethers.utils.parseEther("1");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
+
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
+
+        const mintAmount = ethers.utils.parseEther("1.491803278688524589");
+
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        )
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
+
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("8.001497753369945083")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("9.010873501734693138")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
+
+      it("Should ZapIn when user gives token1 > token0 > 0", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("4.2");
+        const amount1Desired = ethers.utils.parseEther("10");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
+
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
+
+        const mintAmount = ethers.utils.parseEther("5.151340615690168819");
+
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        )
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
+
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("5.889761766643397209")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("3.793981945837512535")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
+
+      it("Should ZapIn with default slipagge if maxSwapSlippage = 0", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("10");
+        const amount1Desired = ethers.utils.parseEther("1");
+        const maxSwapSlippage = BigNumber.from(0);
+
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
+
+        const mintAmount = ethers.utils.parseEther("1.496481998766317457");
+
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        )
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
+
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("7.991950726551513837")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("9.01100041122751413")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
     });
   });
-  describe("Reverts ZapIn when using out of range values", () => {
+  describe("ZapIn in an unbalanced small pool", () => {
     beforeEach(async () => {
-      // Deployer loads the pool with some tokens
-      const amount0Max = ethers.utils.parseEther("100");
-      const amount1Max = ethers.utils.parseEther("100");
+      // We create a UniswapV3 pool with the mock tokens
+      await uniswapFactory.createPool(token0.address, token1.address, "3000");
+      uniswapPoolAddress = await uniswapFactory.getPool(
+        token0.address,
+        token1.address,
+        "10000" // 1%
+      );
 
-      const amounts = await grizzlyVault.getMintAmounts(amount0Max, amount1Max);
+      uniswapPool = (await ethers.getContractAt(
+        "IUniswapV3Pool",
+        uniswapPoolAddress
+      )) as IUniswapV3Pool;
 
-      token0.approve(grizzlyVault.address, amounts.amount0);
-      token1.approve(grizzlyVault.address, amounts.amount1);
+      await uniswapPool.initialize(encodePriceSqrt("1", "1"));
+      await uniswapPool.increaseObservationCardinalityNext("5");
 
-      grizzlyVault.mint(amounts.mintAmount, deployerGrizzly);
+      // We create a Grizzly vault
+      await grizzlyFactory.cloneGrizzlyVault(
+        token0.address,
+        token1.address,
+        10000,
+        0,
+        -887220,
+        887220,
+        manager
+      );
+
+      vaultAddress = (await grizzlyFactory.getVaults(deployerGrizzly))[0];
+
+      grizzlyVault = await ethers.getContractAt("GrizzlyVault", vaultAddress);
     });
+    describe("Reverts ZapIn when not correctly done", () => {
+      it("Should revert ZapIn when vault and pool do not correspond", async () => {
+        const amount0Desired = ethers.utils.parseEther("1");
+        const amount1Desired = ethers.utils.parseEther("0");
+        const maxSwapSlippage = BigNumber.from(10); // 0.1%
 
-    it("Should revert ZapIn when not enough allowance", async () => {
-      // We let user to ZapIn
-      const amount0Desired = ethers.utils.parseEther("10");
-      const amount1Desired = ethers.utils.parseEther("10");
-      const maxSwapSlippage = BigNumber.from(10000); // 1%
+        expect(
+          zapContract.zapIn(
+            ethers.constants.AddressZero,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("wrong pool");
+      });
 
-      await token0.connect(user).approve(zapContract.address, amount0Desired);
-      await token1.connect(user).approve(zapContract.address, amount1Desired);
+      it("Should revert ZapIn when token not approved", async () => {
+        const amount0Desired = ethers.utils.parseEther("1");
+        const amount1Desired = ethers.utils.parseEther("0");
+        const maxSwapSlippage = BigNumber.from(10); // 0.1%
 
-      expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          ethers.utils.parseEther("11"),
-          amount1Desired,
-          maxSwapSlippage
-        )
-      ).to.be.revertedWith("ERC20: insufficient allowance");
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("ERC20: insufficient allowance");
+      });
 
-      expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          amount0Desired,
-          ethers.utils.parseEther("11"),
-          maxSwapSlippage
-        )
-      ).to.be.revertedWith("ERC20: insufficient allowance");
+      it("Should revert ZapIn when pool has no funds", async () => {
+        const amount0Desired = ethers.utils.parseEther("1");
+        const amount1Desired = ethers.utils.parseEther("0");
+        const maxSwapSlippage = BigNumber.from(10); // 0.1%
+
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("mint 0");
+      });
     });
+    describe("Reverts ZapIn when using out of range values", () => {
+      beforeEach(async () => {
+        // Deployer loads the pool with some tokens
+        const amount0Max = ethers.utils.parseEther("100");
+        const amount1Max = ethers.utils.parseEther("100");
 
-    it("Should revert ZapIn when price gets out of liquidity range", async () => {
-      // We charge user account with more tokens
-      token0.transfer(user.address, ethers.utils.parseEther("100"));
-      token1.transfer(user.address, ethers.utils.parseEther("100"));
+        const amounts = await grizzlyVault.getMintAmounts(
+          amount0Max,
+          amount1Max
+        );
 
-      // We let user to ZapIn
-      const amount0Desired = ethers.utils.parseEther("100");
-      const amount1Desired = ethers.utils.parseEther("1");
-      const maxSwapSlippage = BigNumber.from(1000000); // 100%
+        token0.approve(grizzlyVault.address, amounts.amount0);
+        token1.approve(grizzlyVault.address, amounts.amount1);
 
-      await token0.connect(user).approve(zapContract.address, amount0Desired);
-      await token1.connect(user).approve(zapContract.address, amount1Desired);
+        grizzlyVault.mint(amounts.mintAmount, deployerGrizzly);
+      });
 
-      expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          amount0Desired,
-          amount1Desired,
-          maxSwapSlippage
-        )
-      ).to.be.revertedWith("SPL");
+      it("Should revert ZapIn when not enough allowance", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("10");
+        const amount1Desired = ethers.utils.parseEther("10");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
 
-      expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          amount1Desired,
-          amount0Desired,
-          maxSwapSlippage
-        )
-      ).to.be.revertedWith("SPL");
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
+
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            ethers.utils.parseEther("11"),
+            amount1Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("ERC20: insufficient allowance");
+
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            ethers.utils.parseEther("11"),
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("ERC20: insufficient allowance");
+      });
+
+      it("Should revert ZapIn when price gets out of liquidity range", async () => {
+        // We charge user account with more tokens
+        token0.transfer(user.address, ethers.utils.parseEther("100"));
+        token1.transfer(user.address, ethers.utils.parseEther("100"));
+
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("100");
+        const amount1Desired = ethers.utils.parseEther("1");
+        const maxSwapSlippage = BigNumber.from(1000000); // 100%
+
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
+
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("SPL");
+
+        expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount1Desired,
+            amount0Desired,
+            maxSwapSlippage
+          )
+        ).to.be.revertedWith("SPL");
+      });
+
+      // it("Should ZapIn when user gives token1 > token0 > 0", async () => {
+      //   // We let user to ZapIn
+      //   const amount0Desired = ethers.utils.parseEther("1");
+      //   const amount1Desired = ethers.utils.parseEther("1");
+      //   const maxSwapSlippage = BigNumber.from(1000000); // 100%
+
+      //   await token0.connect(user).approve(zapContract.address, amount0Desired);
+      //   await token1.connect(user).approve(zapContract.address, amount1Desired);
+
+      //   const mintAmount = ethers.utils.parseEther("5.151340615690168819");
+
+      //   await zapContract.zapIn(
+      //     uniswapPoolAddress,
+      //     vaultAddress,
+      //     amount0Desired,
+      //     amount1Desired,
+      //     maxSwapSlippage
+      //   );
+
+      //   // await expect(
+      //   //   zapContract.zapIn(
+      //   //     uniswapPoolAddress,
+      //   //     vaultAddress,
+      //   //     amount0Desired,
+      //   //     amount1Desired,
+      //   //     maxSwapSlippage
+      //   //   )
+      //   // )
+      //   //   .to.emit(zapContract, "ZapInVault")
+      //   //   .withArgs(user.address, vaultAddress, mintAmount);
+
+      //   // We check token balances after zap
+      //   const balance0After = await token0.balanceOf(user.address);
+      //   const balance1After = await token1.balanceOf(user.address);
+      //   const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+
+      //   // expect(balance0After).to.be.eq(
+      //   //   ethers.utils.parseEther("5.889761766643397209")
+      //   // );
+      //   // expect(balance1After).to.be.eq(
+      //   //   ethers.utils.parseEther("3.793981945837512535")
+      //   // );
+      //   //expect(balanceTokenVault).to.be.eq(mintAmount);
+      //   console.log("BALANCE 0 AFTER", ethers.utils.formatEther(balance0After));
+      //   console.log("BALANCE 1 AFTER", ethers.utils.formatEther(balance1After));
+      // });
     });
+    describe("Correctly ZapIn with different amounts", () => {
+      beforeEach(async () => {
+        // Deployer loads the pool with some tokens
+        const amount0Max = ethers.utils.parseEther("100");
+        const amount1Max = ethers.utils.parseEther("100");
 
-    // it("Should ZapIn when user gives token1 > token0 > 0", async () => {
-    //   // We let user to ZapIn
-    //   const amount0Desired = ethers.utils.parseEther("1");
-    //   const amount1Desired = ethers.utils.parseEther("1");
-    //   const maxSwapSlippage = BigNumber.from(1000000); // 100%
+        const amounts = await grizzlyVault.getMintAmounts(
+          amount0Max,
+          amount1Max
+        );
 
-    //   await token0.connect(user).approve(zapContract.address, amount0Desired);
-    //   await token1.connect(user).approve(zapContract.address, amount1Desired);
+        token0.approve(grizzlyVault.address, amounts.amount0);
+        token1.approve(grizzlyVault.address, amounts.amount1);
 
-    //   const mintAmount = ethers.utils.parseEther("5.151340615690168819");
+        grizzlyVault.mint(amounts.mintAmount, deployerGrizzly);
+      });
 
-    //   await zapContract.zapIn(
-    //     uniswapPoolAddress,
-    //     vaultAddress,
-    //     amount0Desired,
-    //     amount1Desired,
-    //     maxSwapSlippage
-    //   );
+      it("Should ZapIn when user gives token0 = token 1 > 0", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("1");
+        const amount1Desired = ethers.utils.parseEther("1");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
 
-    //   // await expect(
-    //   //   zapContract.zapIn(
-    //   //     uniswapPoolAddress,
-    //   //     vaultAddress,
-    //   //     amount0Desired,
-    //   //     amount1Desired,
-    //   //     maxSwapSlippage
-    //   //   )
-    //   // )
-    //   //   .to.emit(zapContract, "ZapInVault")
-    //   //   .withArgs(user.address, vaultAddress, mintAmount);
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
 
-    //   // We check token balances after zap
-    //   const balance0After = await token0.balanceOf(user.address);
-    //   const balance1After = await token1.balanceOf(user.address);
-    //   const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+        const mintAmount = ethers.utils.parseEther("0.999999999999999999");
 
-    //   // expect(balance0After).to.be.eq(
-    //   //   ethers.utils.parseEther("5.889761766643397209")
-    //   // );
-    //   // expect(balance1After).to.be.eq(
-    //   //   ethers.utils.parseEther("3.793981945837512535")
-    //   // );
-    //   //expect(balanceTokenVault).to.be.eq(mintAmount);
-    //   console.log("BALANCE 0 AFTER", ethers.utils.formatEther(balance0After));
-    //   console.log("BALANCE 1 AFTER", ethers.utils.formatEther(balance1After));
-    // });
-  });
-  describe("Correctly ZapIn with different amounts", () => {
-    beforeEach(async () => {
-      // Deployer loads the pool with some tokens
-      const amount0Max = ethers.utils.parseEther("100");
-      const amount1Max = ethers.utils.parseEther("100");
-
-      const amounts = await grizzlyVault.getMintAmounts(amount0Max, amount1Max);
-
-      token0.approve(grizzlyVault.address, amounts.amount0);
-      token1.approve(grizzlyVault.address, amounts.amount1);
-
-      grizzlyVault.mint(amounts.mintAmount, deployerGrizzly);
-    });
-
-    it("Should ZapIn when user gives token0 = token 1 > 0", async () => {
-      // We let user to ZapIn
-      const amount0Desired = ethers.utils.parseEther("1");
-      const amount1Desired = ethers.utils.parseEther("1");
-      const maxSwapSlippage = BigNumber.from(10000); // 1%
-
-      await token0.connect(user).approve(zapContract.address, amount0Desired);
-      await token1.connect(user).approve(zapContract.address, amount1Desired);
-
-      const mintAmount = ethers.utils.parseEther("0.999999999999999999");
-
-      await expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          amount0Desired,
-          amount1Desired,
-          maxSwapSlippage
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
         )
-      )
-        .to.emit(zapContract, "ZapInVault")
-        .withArgs(user.address, vaultAddress, mintAmount);
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
 
-      // We check token balances after zap
-      const balance0After = await token0.balanceOf(user.address);
-      const balance1After = await token1.balanceOf(user.address);
-      const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
 
-      expect(balance0After).to.be.eq(
-        ethers.utils.parseEther("9.000000000000000001")
-      );
-      expect(balance1After).to.be.eq(
-        ethers.utils.parseEther("9.000000000000000001")
-      );
-      expect(balanceTokenVault).to.be.eq(mintAmount);
-    });
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("9.000000000000000001")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("9.000000000000000001")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
 
-    it("Should ZapIn when user gives token0 > 0 = token1", async () => {
-      // We let user to ZapIn
-      const amount0Desired = ethers.utils.parseEther("1");
-      const amount1Desired = ethers.utils.parseEther("0");
-      const maxSwapSlippage = BigNumber.from(10000); // 1%
+      it("Should ZapIn when user gives token0 > 0 = token1", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("1");
+        const amount1Desired = ethers.utils.parseEther("0");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
 
-      await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
 
-      const mintAmount = ethers.utils.parseEther("0.496770988574267262");
+        const mintAmount = ethers.utils.parseEther("0.496770988574267262");
 
-      await expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          amount0Desired,
-          amount1Desired,
-          maxSwapSlippage
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
         )
-      )
-        .to.emit(zapContract, "ZapInVault")
-        .withArgs(user.address, vaultAddress, mintAmount);
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
 
-      // We check token balances after zap
-      const balance0After = await token0.balanceOf(user.address);
-      const balance1After = await token1.balanceOf(user.address);
-      const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
 
-      expect(balance0After).to.be.eq(
-        ethers.utils.parseEther("9.001497753369945084")
-      );
-      expect(balance1After).to.be.eq(
-        ethers.utils.parseEther("10.000977515753211757")
-      );
-      expect(balanceTokenVault).to.be.eq(mintAmount);
-    });
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("9.001497753369945084")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("10.000977515753211757")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
 
-    it("Should ZapIn when user gives token1 > 0 = token0", async () => {
-      // We let user to ZapIn
-      const amount0Desired = ethers.utils.parseEther("0");
-      const amount1Desired = ethers.utils.parseEther("1");
-      const maxSwapSlippage = BigNumber.from(10000); // 1%
+      it("Should ZapIn when user gives token1 > 0 = token0", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("0");
+        const amount1Desired = ethers.utils.parseEther("1");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
 
-      await token1.connect(user).approve(zapContract.address, amount1Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
 
-      const mintAmount = ethers.utils.parseEther("0.496770988574267262");
+        const mintAmount = ethers.utils.parseEther("0.496770988574267262");
 
-      await expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          amount0Desired,
-          amount1Desired,
-          maxSwapSlippage
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
         )
-      )
-        .to.emit(zapContract, "ZapInVault")
-        .withArgs(user.address, vaultAddress, mintAmount);
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
 
-      // We check token balances after zap
-      const balance0After = await token0.balanceOf(user.address);
-      const balance1After = await token1.balanceOf(user.address);
-      const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
 
-      expect(balance0After).to.be.eq(
-        ethers.utils.parseEther("10.000977515753211757")
-      );
-      expect(balance1After).to.be.eq(
-        ethers.utils.parseEther("9.001497753369945084")
-      );
-      expect(balanceTokenVault).to.be.eq(mintAmount);
-    });
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("10.000977515753211757")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("9.001497753369945084")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
 
-    it("Should ZapIn when user gives token0 > token1 > 0", async () => {
-      // We let user to ZapIn
-      const amount0Desired = ethers.utils.parseEther("2");
-      const amount1Desired = ethers.utils.parseEther("1");
-      const maxSwapSlippage = BigNumber.from(10000); // 1%
+      it("Should ZapIn when user gives token0 > token1 > 0", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("2");
+        const amount1Desired = ethers.utils.parseEther("1");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
 
-      await token0.connect(user).approve(zapContract.address, amount0Desired);
-      await token1.connect(user).approve(zapContract.address, amount1Desired);
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
 
-      const mintAmount = ethers.utils.parseEther("1.491803278688524589");
+        const mintAmount = ethers.utils.parseEther("1.491803278688524589");
 
-      await expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          amount0Desired,
-          amount1Desired,
-          maxSwapSlippage
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
         )
-      )
-        .to.emit(zapContract, "ZapInVault")
-        .withArgs(user.address, vaultAddress, mintAmount);
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
 
-      // We check token balances after zap
-      const balance0After = await token0.balanceOf(user.address);
-      const balance1After = await token1.balanceOf(user.address);
-      const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
 
-      expect(balance0After).to.be.eq(
-        ethers.utils.parseEther("8.001497753369945083")
-      );
-      expect(balance1After).to.be.eq(
-        ethers.utils.parseEther("9.010873501734693138")
-      );
-      expect(balanceTokenVault).to.be.eq(mintAmount);
-    });
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("8.001497753369945083")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("9.010873501734693138")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
 
-    it("Should ZapIn when user gives token1 > token0 > 0", async () => {
-      // We let user to ZapIn
-      const amount0Desired = ethers.utils.parseEther("4.2");
-      const amount1Desired = ethers.utils.parseEther("10");
-      const maxSwapSlippage = BigNumber.from(10000); // 1%
+      it("Should ZapIn when user gives token1 > token0 > 0", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("4.2");
+        const amount1Desired = ethers.utils.parseEther("10");
+        const maxSwapSlippage = BigNumber.from(10000); // 1%
 
-      await token0.connect(user).approve(zapContract.address, amount0Desired);
-      await token1.connect(user).approve(zapContract.address, amount1Desired);
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
 
-      const mintAmount = ethers.utils.parseEther("5.151340615690168819");
+        const mintAmount = ethers.utils.parseEther("5.151340615690168819");
 
-      await expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          amount0Desired,
-          amount1Desired,
-          maxSwapSlippage
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
         )
-      )
-        .to.emit(zapContract, "ZapInVault")
-        .withArgs(user.address, vaultAddress, mintAmount);
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
 
-      // We check token balances after zap
-      const balance0After = await token0.balanceOf(user.address);
-      const balance1After = await token1.balanceOf(user.address);
-      const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
 
-      expect(balance0After).to.be.eq(
-        ethers.utils.parseEther("5.889761766643397209")
-      );
-      expect(balance1After).to.be.eq(
-        ethers.utils.parseEther("3.793981945837512535")
-      );
-      expect(balanceTokenVault).to.be.eq(mintAmount);
-    });
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("5.889761766643397209")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("3.793981945837512535")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
 
-    it("Should ZapIn with default slipagge if maxSwapSlippage = 0", async () => {
-      // We let user to ZapIn
-      const amount0Desired = ethers.utils.parseEther("10");
-      const amount1Desired = ethers.utils.parseEther("1");
-      const maxSwapSlippage = BigNumber.from(0);
+      it("Should ZapIn with default slipagge if maxSwapSlippage = 0", async () => {
+        // We let user to ZapIn
+        const amount0Desired = ethers.utils.parseEther("10");
+        const amount1Desired = ethers.utils.parseEther("1");
+        const maxSwapSlippage = BigNumber.from(0);
 
-      await token0.connect(user).approve(zapContract.address, amount0Desired);
-      await token1.connect(user).approve(zapContract.address, amount1Desired);
+        await token0.connect(user).approve(zapContract.address, amount0Desired);
+        await token1.connect(user).approve(zapContract.address, amount1Desired);
 
-      const mintAmount = ethers.utils.parseEther("1.496481998766317457");
+        const mintAmount = ethers.utils.parseEther("1.496481998766317457");
 
-      await expect(
-        zapContract.zapIn(
-          uniswapPoolAddress,
-          vaultAddress,
-          amount0Desired,
-          amount1Desired,
-          maxSwapSlippage
+        await expect(
+          zapContract.zapIn(
+            uniswapPoolAddress,
+            vaultAddress,
+            amount0Desired,
+            amount1Desired,
+            maxSwapSlippage
+          )
         )
-      )
-        .to.emit(zapContract, "ZapInVault")
-        .withArgs(user.address, vaultAddress, mintAmount);
+          .to.emit(zapContract, "ZapInVault")
+          .withArgs(user.address, vaultAddress, mintAmount);
 
-      // We check token balances after zap
-      const balance0After = await token0.balanceOf(user.address);
-      const balance1After = await token1.balanceOf(user.address);
-      const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
+        // We check token balances after zap
+        const balance0After = await token0.balanceOf(user.address);
+        const balance1After = await token1.balanceOf(user.address);
+        const balanceTokenVault = await grizzlyVault.balanceOf(user.address);
 
-      expect(balance0After).to.be.eq(
-        ethers.utils.parseEther("7.991950726551513837")
-      );
-      expect(balance1After).to.be.eq(
-        ethers.utils.parseEther("9.01100041122751413")
-      );
-      expect(balanceTokenVault).to.be.eq(mintAmount);
+        expect(balance0After).to.be.eq(
+          ethers.utils.parseEther("7.991950726551513837")
+        );
+        expect(balance1After).to.be.eq(
+          ethers.utils.parseEther("9.01100041122751413")
+        );
+        expect(balanceTokenVault).to.be.eq(mintAmount);
+      });
     });
   });
 });
