@@ -11,6 +11,8 @@ import {
   ZapContract,
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import * as helpers from "@nomicfoundation/hardhat-network-helpers";
+
 
 bn.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
 
@@ -38,20 +40,27 @@ describe("Grizzly Vault Contracts", () => {
   let token1: IERC20;
   let grizzlyCoreVault: GrizzlyVault;
   let grizzlyVault: GrizzlyVault;
+  let tempGrizzlyVault: GrizzlyVault; // can be replaced with grizzlyVault, refactor
   let grizzlyFactory: GrizzlyVaultFactory;
 
   let uniswapPoolAddress: string;
   let vaultAddress: string;
+  let tempVaultAddress: string; //can be replaced with vaultAddress, refactor
 
+  let randomUser: SignerWithAddress;
   let user: SignerWithAddress;
   let deployerGrizzly: string;
   let manager: string;
-
+  let tempRandomUserSigner: SignerWithAddress;
+  let tempManagerSigner: SignerWithAddress;
+  
   before(async () => {
+    [tempRandomUserSigner,tempManagerSigner] = await ethers.getSigners();
     const accounts = await getNamedAccounts();
     deployerGrizzly = accounts.deployer;
     manager = accounts.manager;
     user = (await ethers.getSigners())[2];
+    randomUser = (await ethers.getSigners())[3];
   });
 
   beforeEach(async () => {
@@ -76,8 +85,8 @@ describe("Grizzly Vault Contracts", () => {
     token1 = await ethers.getContract("Token1", deployerGrizzly);
 
     // We charge user account with some tokens
-    token0.transfer(user.address, ethers.utils.parseEther("10"));
-    token1.transfer(user.address, ethers.utils.parseEther("10"));
+    token0.transfer(user.address, ethers.utils.parseEther("100"));
+    token1.transfer(user.address, ethers.utils.parseEther("100"));
 
     // Sort token0 & token1 so it follows the same order as Uniswap & the GrizzlyVaultFactory
     if (BigNumber.from(token0.address).gt(BigNumber.from(token1.address))) {
@@ -151,7 +160,7 @@ describe("Grizzly Vault Contracts", () => {
       });
 
       describe("Clones a Grizzly Vault", () => {
-        it("Should correctly clone a vaut", async () => {
+        it("Should correctly clone a vault", async () => {
           expect(await grizzlyFactory.numVaults(deployerGrizzly)).to.be.eq(
             BigNumber.from(1)
           );
@@ -170,7 +179,7 @@ describe("Grizzly Vault Contracts", () => {
         });
       });
     });
-
+    
     describe("Token name", () => {
       it("Should get correct name", async () => {
         const tokenName = await grizzlyFactory.getTokenName(
@@ -207,9 +216,72 @@ describe("Grizzly Vault Contracts", () => {
         );
       });
     });
-  });
-});
+    describe("Check Access Control", () => {
+      // Check if only owner can set implementation vault
+      it("Should revert when not owner", async () => {
+        await expect(
+          grizzlyFactory
+            .connect(randomUser)
+            .setImplementationVault(grizzlyVault.address)
+        ).to.be.revertedWith("Ownable: caller is not the owner");
+      });
 
+      // Change implementationVault
+      it("Should set new implementation vault correctly", async () => {
+        // Check old implementationVault address 
+        expect(await grizzlyFactory.implementation()).to.be.eq(
+          grizzlyCoreVault.address
+        );
+
+        // Change implementationVault address
+        await expect(
+          grizzlyFactory.setImplementationVault(randomUser.address)
+        )
+          .to.emit(grizzlyFactory, "ImplementationVaultChanged")
+          .withArgs(randomUser.address, grizzlyCoreVault.address);
+
+        // Check new implementationVault address
+        expect(await grizzlyFactory.implementation()).to.be.eq(
+          randomUser.address
+        );
+      });
+      it("should run executiverebalance in current vault", async () => {
+        // clone a new vault 
+        await grizzlyFactory.cloneGrizzlyVault(
+          token0.address,
+          token1.address,
+          3000,
+          0,
+          -887220,
+          887220,
+          user.address
+        );
+        // save new vaults address
+        tempVaultAddress = (await grizzlyFactory.getVaults(deployerGrizzly))[1];
+        tempGrizzlyVault = await ethers.getContractAt("GrizzlyVault", tempVaultAddress);
+ 
+        // run executiverebalance on new vault as randomUserSigner
+        await expect(
+          tempGrizzlyVault.connect(randomUser).executiveRebalance(
+            -887220,
+            887220,
+            3000,
+          )).to.be.revertedWith("Ownable: caller is not the manager");
+          
+        // run rebalance on new vault as randomUserSigner
+        await expect(
+          tempGrizzlyVault.connect(randomUser).rebalance()
+          ).to.be.revertedWith("not authorized");
+
+        // run withdraw ManagerBalance as randomUser
+        await expect(
+          tempGrizzlyVault.connect(randomUser).withdrawManagerBalance()
+          ).to.be.revertedWith("not authorized");
+    });
+  });
+
+  });
+})
 // import { expect } from "chai";
 // import { BigNumber } from "bignumber.js";
 // import { ethers, network } from "hardhat";

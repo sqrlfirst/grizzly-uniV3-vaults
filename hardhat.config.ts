@@ -5,6 +5,7 @@ import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
+import "@nomicfoundation/hardhat-network-helpers";
 import "hardhat-deploy";
 import "solidity-coverage";
 import "hardhat-contract-sizer";
