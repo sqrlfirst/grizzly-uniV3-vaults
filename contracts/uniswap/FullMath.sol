@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.4;
+// solhint-disable
+pragma solidity 0.8.18;
 
 /// @title Contains 512-bit math functions
 /// @notice Facilitates multiplication and division that can have overflow of an intermediate value without any loss of precision
@@ -127,3 +128,4 @@ library FullMath {
 		}
 	}
 }
+
