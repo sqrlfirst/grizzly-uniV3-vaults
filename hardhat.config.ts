@@ -10,6 +10,7 @@ import "hardhat-deploy";
 import "solidity-coverage";
 import "hardhat-contract-sizer";
 import "hardhat-tracer";
+import "hardhat-ignore-warnings";
 import "./lib/uniswap";
 
 // Process Env Variables
@@ -66,7 +67,7 @@ const config: HardhatUserConfig = {
         },
       },
       {
-        version: "0.8.4",
+        version: "0.8.18",
         settings: {
           optimizer: { enabled: true, runs: 500 },
         },
@@ -85,6 +86,14 @@ const config: HardhatUserConfig = {
   //   runOnCompile: true,
   //   strict: true,
   // },
+
+  warnings: {
+    // removes pure/view mutability warning:
+    "*": {
+      "func-mutability": "off",
+      default: "warn",
+    },
+  },
 };
 
 export default config;
