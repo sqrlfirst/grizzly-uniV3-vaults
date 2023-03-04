@@ -8,11 +8,9 @@ import {
   IUniswapV3Pool,
   GrizzlyVault,
   GrizzlyVaultFactory,
-  ZapContract,
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import * as helpers from "@nomicfoundation/hardhat-network-helpers";
-
+//import * as helpers from "@nomicfoundation/hardhat-network-helpers";
 
 bn.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
 
@@ -40,27 +38,18 @@ describe("Grizzly Vault Contracts", () => {
   let token1: IERC20;
   let grizzlyCoreVault: GrizzlyVault;
   let grizzlyVault: GrizzlyVault;
-  let tempGrizzlyVault: GrizzlyVault; // can be replaced with grizzlyVault, refactor
   let grizzlyFactory: GrizzlyVaultFactory;
 
   let uniswapPoolAddress: string;
   let vaultAddress: string;
-  let tempVaultAddress: string; //can be replaced with vaultAddress, refactor
 
-  let randomUser: SignerWithAddress;
+  let deployerGrizzly: SignerWithAddress;
+  let manager: SignerWithAddress;
   let user: SignerWithAddress;
-  let deployerGrizzly: string;
-  let manager: string;
-  let tempRandomUserSigner: SignerWithAddress;
-  let tempManagerSigner: SignerWithAddress;
-  
+  let bot: SignerWithAddress;
+
   before(async () => {
-    [tempRandomUserSigner,tempManagerSigner] = await ethers.getSigners();
-    const accounts = await getNamedAccounts();
-    deployerGrizzly = accounts.deployer;
-    manager = accounts.manager;
-    user = (await ethers.getSigners())[2];
-    randomUser = (await ethers.getSigners())[3];
+    [deployerGrizzly, manager, user, bot] = await ethers.getSigners();
   });
 
   beforeEach(async () => {
@@ -119,10 +108,10 @@ describe("Grizzly Vault Contracts", () => {
       0,
       -887220,
       887220,
-      manager
+      manager.address
     );
 
-    vaultAddress = (await grizzlyFactory.getVaults(deployerGrizzly))[0];
+    vaultAddress = (await grizzlyFactory.getVaults(deployerGrizzly.address))[0];
 
     grizzlyVault = await ethers.getContractAt("GrizzlyVault", vaultAddress);
   });
@@ -139,7 +128,7 @@ describe("Grizzly Vault Contracts", () => {
               0,
               -887220,
               887220,
-              manager
+              manager.address
             )
           ).to.be.revertedWith("uniV3Pool does not exist");
         });
@@ -153,7 +142,7 @@ describe("Grizzly Vault Contracts", () => {
               0,
               -88722,
               887220,
-              manager
+              manager.address
             )
           ).to.be.revertedWith("tickSpacing mismatch");
         });
@@ -161,9 +150,9 @@ describe("Grizzly Vault Contracts", () => {
 
       describe("Clones a Grizzly Vault", () => {
         it("Should correctly clone a vault", async () => {
-          expect(await grizzlyFactory.numVaults(deployerGrizzly)).to.be.eq(
-            BigNumber.from(1)
-          );
+          expect(
+            await grizzlyFactory.numVaults(deployerGrizzly.address)
+          ).to.be.eq(BigNumber.from(1));
           await grizzlyFactory.cloneGrizzlyVault(
             token0.address,
             token1.address,
@@ -171,15 +160,15 @@ describe("Grizzly Vault Contracts", () => {
             0,
             -887220,
             887220,
-            manager
+            manager.address
           );
-          expect(await grizzlyFactory.numVaults(deployerGrizzly)).to.be.eq(
-            BigNumber.from(2)
-          );
+          expect(
+            await grizzlyFactory.numVaults(deployerGrizzly.address)
+          ).to.be.eq(BigNumber.from(2));
         });
       });
     });
-    
+
     describe("Token name", () => {
       it("Should get correct name", async () => {
         const tokenName = await grizzlyFactory.getTokenName(
@@ -191,10 +180,18 @@ describe("Grizzly Vault Contracts", () => {
     });
 
     describe("Set implementation vault", () => {
-      it("Should revertwith 0 address", () => {
+      it("Should revert with 0 address", () => {
         expect(
           grizzlyFactory.setImplementationVault(ethers.constants.AddressZero)
         ).to.be.revertedWith("zeroAddress");
+      });
+
+      it("Should revert when not owner", async () => {
+        await expect(
+          grizzlyFactory
+            .connect(user)
+            .setImplementationVault(grizzlyVault.address)
+        ).to.be.revertedWith("Ownable: caller is not the owner");
       });
 
       it("Should set new implementation vault correctly", async () => {
@@ -216,72 +213,465 @@ describe("Grizzly Vault Contracts", () => {
         );
       });
     });
-    describe("Check Access Control", () => {
-      // Check if only owner can set implementation vault
-      it("Should revert when not owner", async () => {
-        await expect(
-          grizzlyFactory
-            .connect(randomUser)
-            .setImplementationVault(grizzlyVault.address)
-        ).to.be.revertedWith("Ownable: caller is not the owner");
+
+    describe("Grizzly Vault", () => {
+      describe("External view functions", () => {
+        describe("Get mint amounts", () => {
+          it("Should provide the right mint amounts without initial liquidity", async () => {
+            const APROX_ONE = ethers.utils.parseEther("0.999999999999999999");
+            const ONE = ethers.utils.parseEther("1");
+            const ZERO = ethers.utils.parseEther("0");
+
+            // Equal amounts
+            let amount0Max = ethers.utils.parseEther("1");
+            let amount1Max = ethers.utils.parseEther("1");
+
+            let amounts = await grizzlyVault.getMintAmounts(
+              amount0Max,
+              amount1Max
+            );
+
+            expect(amounts.amount0).to.be.eq(APROX_ONE);
+            expect(amounts.amount1).to.be.eq(APROX_ONE);
+            expect(amounts.mintAmount).to.be.eq(ONE);
+
+            // Unbalanced amounts with token0 > token1
+            amount0Max = ethers.utils.parseEther("10");
+            amount1Max = ethers.utils.parseEther("1");
+
+            amounts = await grizzlyVault.getMintAmounts(amount0Max, amount1Max);
+
+            expect(amounts.amount0).to.be.eq(APROX_ONE);
+            expect(amounts.amount1).to.be.eq(APROX_ONE);
+            expect(amounts.mintAmount).to.be.eq(ONE);
+
+            // Unbalanced amounts with token1 > token0
+            amount0Max = ethers.utils.parseEther("1");
+            amount1Max = ethers.utils.parseEther("10");
+
+            amounts = await grizzlyVault.getMintAmounts(amount0Max, amount1Max);
+
+            expect(amounts.amount0).to.be.eq(APROX_ONE);
+            expect(amounts.amount1).to.be.eq(APROX_ONE);
+            expect(amounts.mintAmount).to.be.eq(ONE);
+
+            // Unbalanced amounts with 0 balance token1
+            amount0Max = ethers.utils.parseEther("1");
+            amount1Max = ethers.utils.parseEther("0");
+
+            amounts = await grizzlyVault.getMintAmounts(amount0Max, amount1Max);
+
+            expect(amounts.amount0).to.be.eq(ZERO);
+            expect(amounts.amount1).to.be.eq(ZERO);
+            expect(amounts.mintAmount).to.be.eq(ZERO);
+
+            // Unbalanced amounts with 0 balance token1
+            amount0Max = ethers.utils.parseEther("0");
+            amount1Max = ethers.utils.parseEther("1");
+
+            amounts = await grizzlyVault.getMintAmounts(amount0Max, amount1Max);
+
+            expect(amounts.amount0).to.be.eq(ZERO);
+            expect(amounts.amount1).to.be.eq(ZERO);
+            expect(amounts.mintAmount).to.be.eq(ZERO);
+
+            // Both balances equal to 0
+            amount0Max = ethers.utils.parseEther("0");
+            amount1Max = ethers.utils.parseEther("0");
+
+            amounts = await grizzlyVault.getMintAmounts(amount0Max, amount1Max);
+
+            expect(amounts.amount0).to.be.eq(ZERO);
+            expect(amounts.amount1).to.be.eq(ZERO);
+            expect(amounts.mintAmount).to.be.eq(ZERO);
+          });
+
+          it("Should provide the right mint amounts with initial liquidity", async () => {
+            // Deployer loads the pool with some tokens
+            const amount0MaxDep = ethers.utils.parseEther("100");
+            const amount1MaxDep = ethers.utils.parseEther("100");
+
+            const amountsDep = await grizzlyVault.getMintAmounts(
+              amount0MaxDep,
+              amount1MaxDep
+            );
+
+            token0.approve(grizzlyVault.address, amountsDep.amount0);
+            token1.approve(grizzlyVault.address, amountsDep.amount1);
+
+            grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
+
+            // Get Mint amounts for different max amounts
+            const ONE = ethers.utils.parseEther("1");
+
+            // Equal amounts
+            let amount0Max = ethers.utils.parseEther("1");
+            let amount1Max = ethers.utils.parseEther("1");
+
+            let amounts = await grizzlyVault.getMintAmounts(
+              amount0Max,
+              amount1Max
+            );
+            expect(amounts.amount0).to.be.eq(ONE);
+            expect(amounts.amount1).to.be.eq(ONE);
+            expect(amounts.mintAmount).to.be.eq(ONE);
+
+            // Unbalanced amounts with token0 > token1
+            amount0Max = ethers.utils.parseEther("10");
+            amount1Max = ethers.utils.parseEther("1");
+
+            amounts = await grizzlyVault.getMintAmounts(amount0Max, amount1Max);
+
+            expect(amounts.amount0).to.be.eq(ONE);
+            expect(amounts.amount1).to.be.eq(ONE);
+            expect(amounts.mintAmount).to.be.eq(ONE);
+
+            // Unbalanced amounts with token1 > token0
+            amount0Max = ethers.utils.parseEther("1");
+            amount1Max = ethers.utils.parseEther("10");
+
+            amounts = await grizzlyVault.getMintAmounts(amount0Max, amount1Max);
+
+            expect(amounts.amount0).to.be.eq(ONE);
+            expect(amounts.amount1).to.be.eq(ONE);
+            expect(amounts.mintAmount).to.be.eq(ONE);
+
+            // Unbalanced amounts with 0 balance token1
+            amount0Max = ethers.utils.parseEther("1");
+            amount1Max = ethers.utils.parseEther("0");
+
+            expect(
+              grizzlyVault.getMintAmounts(amount0Max, amount1Max)
+            ).to.be.revertedWith("mint 0");
+
+            // Unbalanced amounts with 0 balance token1
+            amount0Max = ethers.utils.parseEther("0");
+            amount1Max = ethers.utils.parseEther("1");
+
+            expect(
+              grizzlyVault.getMintAmounts(amount0Max, amount1Max)
+            ).to.be.revertedWith("mint 0");
+
+            // Both balances equal to 0
+            amount0Max = ethers.utils.parseEther("0");
+            amount1Max = ethers.utils.parseEther("0");
+
+            expect(
+              grizzlyVault.getMintAmounts(amount0Max, amount1Max)
+            ).to.be.revertedWith("mint 0");
+          });
+        });
+        describe("Get underlying balances", () => {
+          it("Should correctly get the balances with empty pool", async () => {
+            const balances = await grizzlyVault.getUnderlyingBalances();
+
+            expect(balances.amount0Current).to.be.eq(BigNumber.from(0));
+            expect(balances.amount1Current).to.be.eq(BigNumber.from(0));
+            // console.log(
+            //   "BALANCES ",
+            //   ethers.utils.formatEther(balances.amount0Current),
+            //   ethers.utils.formatEther(balances.amount1Current)
+            // );
+          });
+
+          it("Should correctly get the balances with charged pool", async () => {
+            // Deployer loads the pool with some tokens
+            const amount0MaxDep = ethers.utils.parseEther("100");
+            const amount1MaxDep = ethers.utils.parseEther("100");
+
+            const amountsDep = await grizzlyVault.getMintAmounts(
+              amount0MaxDep,
+              amount1MaxDep
+            );
+
+            token0.approve(grizzlyVault.address, amountsDep.amount0);
+            token1.approve(grizzlyVault.address, amountsDep.amount1);
+
+            grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
+
+            // We check the balances
+            const balances = await grizzlyVault.getUnderlyingBalances();
+
+            expect(balances.amount0Current).to.be.eq(
+              ethers.utils.parseEther("99.999999999999999998")
+            );
+            expect(balances.amount1Current).to.be.eq(
+              ethers.utils.parseEther("99.999999999999999998")
+            );
+          });
+          it("Should correctly get the balances with charged pool", async () => {
+            // Deployer loads the pool with some tokens
+            const amount0MaxDep = ethers.utils.parseEther("100");
+            const amount1MaxDep = ethers.utils.parseEther("100");
+
+            const amountsDep = await grizzlyVault.getMintAmounts(
+              amount0MaxDep,
+              amount1MaxDep
+            );
+
+            token0.approve(grizzlyVault.address, amountsDep.amount0);
+            token1.approve(grizzlyVault.address, amountsDep.amount1);
+
+            grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
+
+            // We check the balances
+            const balances = await grizzlyVault.getUnderlyingBalances();
+
+            expect(balances.amount0Current).to.be.eq(
+              ethers.utils.parseEther("99.999999999999999998")
+            );
+            expect(balances.amount1Current).to.be.eq(
+              ethers.utils.parseEther("99.999999999999999998")
+            );
+          });
+
+          it("Should correctly get the balances after some swaps", async () => {
+            // TODO (use SwapTest.sol ?)
+            // Deployer loads the pool with some tokens
+            const amount0MaxDep = ethers.utils.parseEther("100");
+            const amount1MaxDep = ethers.utils.parseEther("100");
+
+            const amountsDep = await grizzlyVault.getMintAmounts(
+              amount0MaxDep,
+              amount1MaxDep
+            );
+
+            token0.approve(grizzlyVault.address, amountsDep.amount0);
+            token1.approve(grizzlyVault.address, amountsDep.amount1);
+
+            grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
+
+            // We check the balances
+            const balances = await grizzlyVault.getUnderlyingBalances();
+
+            expect(balances.amount0Current).to.be.eq(
+              ethers.utils.parseEther("99.999999999999999998")
+            );
+            expect(balances.amount1Current).to.be.eq(
+              ethers.utils.parseEther("99.999999999999999998")
+            );
+          });
+        });
+        describe("Get underlying balances at price", () => {});
+        describe("Estimate Fees", () => {});
       });
+      describe("User Functions", () => {
+        describe("Mint", () => {});
+        describe("Burn", () => {
+          let mintAmount: BigNumber;
+          let amount0: BigNumber;
+          let amount1: BigNumber;
+          let defaultMaxSlippage = BigNumber.from("5000");
 
-      // Change implementationVault
-      it("Should set new implementation vault correctly", async () => {
-        // Check old implementationVault address 
-        expect(await grizzlyFactory.implementation()).to.be.eq(
-          grizzlyCoreVault.address
-        );
+          beforeEach(async () => {
+            // We load the pool before being able to swap
+            // Deployer loads the pool with some tokens
+            const amount0MaxDep = ethers.utils.parseEther("100");
+            const amount1MaxDep = ethers.utils.parseEther("100");
 
-        // Change implementationVault address
-        await expect(
-          grizzlyFactory.setImplementationVault(randomUser.address)
-        )
-          .to.emit(grizzlyFactory, "ImplementationVaultChanged")
-          .withArgs(randomUser.address, grizzlyCoreVault.address);
+            const amountsDep = await grizzlyVault.getMintAmounts(
+              amount0MaxDep,
+              amount1MaxDep
+            );
 
-        // Check new implementationVault address
-        expect(await grizzlyFactory.implementation()).to.be.eq(
-          randomUser.address
-        );
+            token0.approve(grizzlyVault.address, amountsDep.amount0);
+            token1.approve(grizzlyVault.address, amountsDep.amount1);
+
+            grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
+
+            // We mint some tokens to be burned after
+            const amount0Max = ethers.utils.parseEther("1.0");
+            const amount1Max = ethers.utils.parseEther("1.0");
+            const amounts = await grizzlyVault.getMintAmounts(
+              amount0Max,
+              amount1Max
+            );
+            mintAmount = amounts.mintAmount;
+            amount0 = amounts.amount0;
+            amount1 = amounts.amount1;
+
+            token0.connect(user).approve(grizzlyVault.address, amount0);
+            token1.connect(user).approve(grizzlyVault.address, amount1);
+
+            grizzlyVault.connect(user).mint(mintAmount, user.address);
+          });
+
+          it("Should revert if burn amount is 0", () => {
+            expect(
+              grizzlyVault.burn(
+                BigNumber.from(0),
+                defaultMaxSlippage,
+                0,
+                user.address
+              )
+            ).to.be.revertedWith("burn 0");
+          });
+
+          it("Should revert if user does not have enough LP tokens", () => {
+            const burnAmount = mintAmount.add(1);
+            expect(
+              grizzlyVault
+                .connect(user)
+                .burn(burnAmount, defaultMaxSlippage, 0, user.address)
+            ).to.be.revertedWith("ERC20: burn amount exceeds balance");
+          });
+
+          it("Should burn and receive both tokens", async () => {
+            const token0BalanceBefore = await token0.balanceOf(user.address);
+            const token1BalanceBefore = await token1.balanceOf(user.address);
+
+            await grizzlyVault
+              .connect(user)
+              .burn(mintAmount, 0, 2, user.address);
+
+            const lpBalanceAfter = await grizzlyVault.balanceOf(user.address);
+            const token0BalanceAfter = await token0.balanceOf(user.address);
+            const token1BalanceAfter = await token1.balanceOf(user.address);
+
+            expect(lpBalanceAfter).to.be.eq(BigNumber.from(0));
+            expect(token0BalanceAfter).to.be.gt(token0BalanceBefore);
+            expect(token1BalanceAfter).to.be.gt(token1BalanceBefore);
+          });
+
+          it("Should burn and receive only token 0 with high slippage", async () => {
+            const token0BalanceBefore = await token0.balanceOf(user.address);
+            const token1BalanceBefore = await token1.balanceOf(user.address);
+
+            const maxSlippage = BigNumber.from("50000"); //5%
+
+            await grizzlyVault
+              .connect(user)
+              .burn(mintAmount, maxSlippage, 0, user.address);
+
+            const lpBalanceAfter = await grizzlyVault.balanceOf(user.address);
+            const token0BalanceAfter = await token0.balanceOf(user.address);
+            const token1BalanceAfter = await token1.balanceOf(user.address);
+
+            expect(lpBalanceAfter).to.be.eq(BigNumber.from(0));
+            expect(token0BalanceAfter).to.be.gt(token0BalanceBefore);
+            expect(token1BalanceAfter).to.be.eq(token1BalanceBefore);
+          });
+
+          it("Should burn and receive only token 1 with high slippage", async () => {
+            const token0BalanceBefore = await token0.balanceOf(user.address);
+            const token1BalanceBefore = await token1.balanceOf(user.address);
+
+            const maxSlippage = BigNumber.from("50000"); //5%
+
+            await grizzlyVault
+              .connect(user)
+              .burn(mintAmount, maxSlippage, 1, user.address);
+
+            const lpBalanceAfter = await grizzlyVault.balanceOf(user.address);
+            const token0BalanceAfter = await token0.balanceOf(user.address);
+            const token1BalanceAfter = await token1.balanceOf(user.address);
+
+            expect(lpBalanceAfter).to.be.eq(BigNumber.from(0));
+            expect(token0BalanceAfter).to.be.eq(token0BalanceBefore);
+            expect(token1BalanceAfter).to.be.gt(token1BalanceBefore);
+          });
+
+          it("Should burn and receive token 0 and some dust token 1 with low slippage", async () => {
+            const token0BalanceBefore = await token0.balanceOf(user.address);
+            const token1BalanceBefore = await token1.balanceOf(user.address);
+
+            const maxSlippage = BigNumber.from("5000"); //0.5%
+
+            await grizzlyVault
+              .connect(user)
+              .burn(mintAmount, maxSlippage, 0, user.address);
+
+            const lpBalanceAfter = await grizzlyVault.balanceOf(user.address);
+            const token0BalanceAfter = await token0.balanceOf(user.address);
+            const token1BalanceAfter = await token1.balanceOf(user.address);
+
+            expect(lpBalanceAfter).to.be.eq(BigNumber.from(0));
+            expect(token0BalanceAfter).to.be.gt(token0BalanceBefore);
+            expect(token1BalanceAfter).to.be.gt(token1BalanceBefore);
+
+            // console.log(
+            //   "TOKEN 0 DELTA:",
+            //   ethers.utils.formatEther(
+            //     token0BalanceAfter.sub(token0BalanceBefore)
+            //   )
+            // );
+
+            // console.log(
+            //   "TOKEN 1 DELTA:",
+            //   ethers.utils.formatEther(
+            //     token1BalanceAfter.sub(token1BalanceBefore)
+            //   )
+            // );
+          });
+
+          it("Should burn and receive token 1 and some dust token 0 with low slippage", async () => {
+            const token0BalanceBefore = await token0.balanceOf(user.address);
+            const token1BalanceBefore = await token1.balanceOf(user.address);
+
+            const maxSlippage = BigNumber.from("5000"); //0.5%
+
+            await grizzlyVault
+              .connect(user)
+              .burn(mintAmount, maxSlippage, 1, user.address);
+
+            const lpBalanceAfter = await grizzlyVault.balanceOf(user.address);
+            const token0BalanceAfter = await token0.balanceOf(user.address);
+            const token1BalanceAfter = await token1.balanceOf(user.address);
+
+            expect(lpBalanceAfter).to.be.eq(BigNumber.from(0));
+            expect(token0BalanceAfter).to.be.gt(token0BalanceBefore);
+            expect(token1BalanceAfter).to.be.gt(token1BalanceBefore);
+          });
+        });
       });
-      it("should run executiverebalance in current vault", async () => {
-        // clone a new vault 
-        await grizzlyFactory.cloneGrizzlyVault(
-          token0.address,
-          token1.address,
-          3000,
-          0,
-          -887220,
-          887220,
-          user.address
-        );
-        // save new vaults address
-        tempVaultAddress = (await grizzlyFactory.getVaults(deployerGrizzly))[1];
-        tempGrizzlyVault = await ethers.getContractAt("GrizzlyVault", tempVaultAddress);
- 
-        // run executiverebalance on new vault as randomUserSigner
-        await expect(
-          tempGrizzlyVault.connect(randomUser).executiveRebalance(
-            -887220,
-            887220,
-            3000,
-          )).to.be.revertedWith("Ownable: caller is not the manager");
-          
-        // run rebalance on new vault as randomUserSigner
-        await expect(
-          tempGrizzlyVault.connect(randomUser).rebalance()
-          ).to.be.revertedWith("not authorized");
+      describe("External manager functions", () => {
+        describe("Executive rebalance", () => {
+          it("Should revert if not manager", () => {
+            // run executiverebalance on vault as deployer
+            expect(
+              grizzlyVault.executiveRebalance(-887220, 887220, 3000)
+            ).to.be.revertedWith("Ownable: caller is not the manager");
 
-        // run withdraw ManagerBalance as randomUser
-        await expect(
-          tempGrizzlyVault.connect(randomUser).withdrawManagerBalance()
-          ).to.be.revertedWith("not authorized");
+            // run executiverebalance on vault as deployer
+            expect(
+              grizzlyVault
+                .connect(user)
+                .executiveRebalance(-887220, 887220, 3000)
+            ).to.be.revertedWith("Ownable: caller is not the manager");
+          });
+        });
+      });
+      describe("External authorized functions", () => {
+        describe("Rebalance", () => {
+          it("Should revert if not authorized", () => {
+            // run rebalance as deployer
+            expect(grizzlyVault.rebalance()).to.be.revertedWith(
+              "not authorized"
+            );
+
+            // run rebalance as user
+            expect(grizzlyVault.connect(user).rebalance()).to.be.revertedWith(
+              "not authorized"
+            );
+          });
+        });
+        describe("Withdraw manager balance", () => {
+          it("Should revert if not authorized", () => {
+            // run as deployer
+            expect(
+              grizzlyVault.connect(user).withdrawManagerBalance()
+            ).to.be.revertedWith("not authorized");
+
+            // run as user
+            expect(
+              grizzlyVault.connect(user).withdrawManagerBalance()
+            ).to.be.revertedWith("not authorized");
+          });
+        });
+      });
     });
   });
-
-  });
-})
+});
 // import { expect } from "chai";
 // import { BigNumber } from "bignumber.js";
 // import { ethers, network } from "hardhat";
