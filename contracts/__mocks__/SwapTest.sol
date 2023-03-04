@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.4;
+pragma solidity 0.8.18;
 
+// solhint-disable max-line-length
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IUniswapV3SwapCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
 contract SwapTest is IUniswapV3SwapCallback {
-	function swap(
-		address pool,
-		bool zeroForOne,
-		int256 amountSpecified
-	) external {
+	function swap(address pool, bool zeroForOne, int256 amountSpecified) external {
 		(uint160 sqrtRatio, , , , , , ) = IUniswapV3Pool(pool).slot0();
 		IUniswapV3Pool(pool).swap(
 			address(msg.sender),
@@ -45,14 +42,7 @@ contract SwapTest is IUniswapV3SwapCallback {
 		bool zeroForOne,
 		int256 amountSpecified,
 		uint160 sqrtPriceLimitX96
-	)
-		external
-		returns (
-			int256 amount0Delta,
-			int256 amount1Delta,
-			uint160 nextSqrtRatio
-		)
-	{
+	) external returns (int256 amount0Delta, int256 amount1Delta, uint160 nextSqrtRatio) {
 		(amount0Delta, amount1Delta) = IUniswapV3Pool(pool).swap(
 			address(msg.sender),
 			zeroForOne,
@@ -86,3 +76,4 @@ contract SwapTest is IUniswapV3SwapCallback {
 		}
 	}
 }
+

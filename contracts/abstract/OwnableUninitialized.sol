@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-
-pragma solidity 0.8.4;
+pragma solidity 0.8.18;
 
 /**
  * @dev Contract module which provides a basic access control mechanism, where
@@ -62,3 +61,4 @@ abstract contract OwnableUninitialized {
 		_manager = newOwner;
 	}
 }
+
