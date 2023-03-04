@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-
-pragma solidity 0.8.4;
+pragma solidity 0.8.18;
 
 import { IUniswapV3Factory } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import { IUniswapV3TickSpacing } from "./interfaces/IUniswapV3TickSpacing.sol";
@@ -13,8 +12,8 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 contract GrizzlyVaultFactory is IGrizzlyVaultFactory, Ownable {
 	using EnumerableSet for EnumerableSet.AddressSet;
 
-	string public constant name = "GrizzlyVaultCloneFactory";
-	string public constant version = "1.0.0";
+	string public constant NAME = "GrizzlyVaultCloneFactory";
+	string public constant VERSION = "1.0.0";
 
 	address public immutable factory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
 
@@ -74,11 +73,12 @@ contract GrizzlyVaultFactory is IGrizzlyVaultFactory, Ownable {
 	/// @param upperTick Initial upper bound of the Uniswap V3 position
 	/// @param manager Address of the manager of the new Vault
 	/// @return newVault Address of the newly created Grizzly Vault (proxy)
+	// solhint-disable-next-line function-max-lines
 	function cloneGrizzlyVault(
 		address tokenA,
 		address tokenB,
 		uint24 uniFee,
-		uint16 managerFee,
+		uint24 managerFee,
 		int24 lowerTick,
 		int24 upperTick,
 		address manager
@@ -139,11 +139,10 @@ contract GrizzlyVaultFactory is IGrizzlyVaultFactory, Ownable {
 		return lowerTick < upperTick && lowerTick % spacing == 0 && upperTick % spacing == 0;
 	}
 
-	function _getTokenOrder(address tokenA, address tokenB)
-		internal
-		pure
-		returns (address token0, address token1)
-	{
+	function _getTokenOrder(
+		address tokenA,
+		address tokenB
+	) internal pure returns (address token0, address token1) {
 		require(tokenA != tokenB, "same token");
 		(token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
 		require(token0 != address(0), "zeroAddress");
@@ -173,3 +172,4 @@ contract GrizzlyVaultFactory is IGrizzlyVaultFactory, Ownable {
 		emit ImplementationVaultChanged(implementation, oldImplementationVault);
 	}
 }
+
