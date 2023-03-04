@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.8.18;
 
-pragma solidity 0.8.4;
-
+// solhint-disable-next-line max-line-length
 import { IUniswapV3SwapCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import { IGrizzlyVault } from "./interfaces/IGrizzlyVault.sol";
 import { TickMath } from "./uniswap/TickMath.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { SignedMath } from "@openzeppelin/contracts/utils/math/SignedMath.sol";
+import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import { prbSqrt } from "@prb/math/src/Common.sol";
 import { LiquidityAmounts } from "./uniswap/LiquidityAmounts.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -22,24 +23,41 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 	}
 
 	// Needed to avoid error compiler stack too deep
-	struct LocalVariables_zapIn {
+	struct LocalVariablesZapIn {
 		IERC20 token0;
 		IERC20 token1;
 		uint256 intermediateAmount0;
 		uint256 intermediateAmount1;
+		uint256 finalAmount0;
+		uint256 finalAmount1;
+		uint256 mintAmount;
+		uint256 amount0;
+		uint256 amount1;
+		uint256 liquidityMinted;
+		uint256 balance0Zap;
+		uint256 balance1Zap;
+		bytes data;
 	}
 
-	struct LocalVariables_balanceAmounts {
+	struct LocalVariablesBalanceAmounts {
 		uint160 sqrtRatioX96;
+		uint128 liquidity;
 		uint24 uniPoolFee;
+		bool zeroForOne;
 		int256 amount0Delta;
 		int256 amount1Delta;
+		uint256 amount0;
+		uint256 amount1;
+		uint256 amountSpecified;
 	}
 
-	string public constant name = "GrizzlyVaultZapContract";
-	string public constant version = "1.0.0";
+	string public constant NAME = "GrizzlyVaultZapContract";
+	string public constant VERSION = "1.0.0";
 
+	/* solhint-disable */
 	uint256 internal constant basisOne = 1000000;
+	uint256 internal constant basisOneSqrt = 1000;
+	/* solhint-enable */
 
 	// In bps, how much slippage we allow between swaps -> 5000 = 0.5% slippage
 	uint256 public slippageUserMax = 5000;
@@ -64,6 +82,7 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 
 	// --- User functions --- //
 
+	// solhint-disable-next-line function-max-lines
 	function zapIn(
 		address pool,
 		address vault,
@@ -73,8 +92,9 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 	) external {
 		// Sanity check
 		require(address(IGrizzlyVault(vault).pool()) == pool, "wrong pool");
+		require(maxSwapSlippage < basisOne, "max slippage too high");
 
-		LocalVariables_zapIn memory vars;
+		LocalVariablesZapIn memory vars;
 
 		IGrizzlyVault.Ticks memory ticks = IGrizzlyVault(vault).baseTicks();
 
@@ -89,37 +109,48 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 			vars.token1.safeTransferFrom(msg.sender, address(this), amount1Desired);
 		}
 
+		vars.data = abi.encode(
+			CallbackData({ token0: address(vars.token0), token1: address(vars.token1), pool: pool })
+		);
+
 		(vars.intermediateAmount0, vars.intermediateAmount1) = _balanceAmounts(
 			pool,
 			ticks,
 			amount0Desired,
 			amount1Desired,
 			maxSwapSlippage,
-			abi.encode(
-				CallbackData({
-					token0: address(vars.token0),
-					token1: address(vars.token1),
-					pool: pool
-				})
-			)
+			vars.data
 		);
 
-		(uint256 finalAmount0, uint256 finalAmount1, uint256 mintAmount) = IGrizzlyVault(vault)
+		(vars.finalAmount0, vars.finalAmount1, vars.mintAmount) = IGrizzlyVault(vault)
 			.getMintAmounts(vars.intermediateAmount0, vars.intermediateAmount1);
 
 		// Approvals
-		vars.token0.safeIncreaseAllowance(vault, finalAmount0);
-		vars.token1.safeIncreaseAllowance(vault, finalAmount1);
+		vars.token0.safeIncreaseAllowance(vault, vars.finalAmount0);
+		vars.token1.safeIncreaseAllowance(vault, vars.finalAmount1);
 
-		IGrizzlyVault(vault).mint(mintAmount, msg.sender);
+		(vars.amount0, vars.amount1, vars.liquidityMinted) = IGrizzlyVault(vault).mint(
+			vars.mintAmount,
+			msg.sender
+		);
+
+		vars.balance0Zap = vars.token0.balanceOf(address(this));
+		vars.balance1Zap = vars.token0.balanceOf(address(this));
+
+		// Swap Dust Back
+		if (vars.balance0Zap > 0 && amount0Desired == 0) {
+			_swap(pool, vars.balance0Zap, true, maxSwapSlippage, vars.data);
+		} else if (vars.balance1Zap > 0 && amount1Desired == 0) {
+			_swap(pool, vars.balance1Zap, false, maxSwapSlippage, vars.data);
+		}
 
 		_transferUserLeftAmounts(vars.token0, vars.token1, msg.sender);
 
-		emit ZapInVault(msg.sender, vault, mintAmount);
+		emit ZapInVault(msg.sender, vault, vars.mintAmount);
 	}
 
 	// --- Internal core functions --- //
-
+	// solhint-disable-next-line function-max-lines
 	function _balanceAmounts(
 		address pool,
 		IGrizzlyVault.Ticks memory ticks,
@@ -128,51 +159,57 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 		uint256 maxSwapSlippage,
 		bytes memory data
 	) internal returns (uint256 finalAmount0, uint256 finalAmount1) {
-		LocalVariables_balanceAmounts memory vars;
+		LocalVariablesBalanceAmounts memory vars;
 
 		(vars.sqrtRatioX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
 
 		// Get max liquidity for amounts available
-		uint128 liquidity = _liquidityForAmounts(
+		vars.liquidity = _liquidityForAmounts(
 			ticks,
 			vars.sqrtRatioX96,
 			amount0Desired,
 			amount1Desired
 		);
 		// Get correct amounts of each token for the liquidity we have
-		(uint256 amount0, uint256 amount1) = _amountsForLiquidity(
-			liquidity,
+		(vars.amount0, vars.amount1) = _amountsForLiquidity(
+			vars.liquidity,
 			ticks,
 			vars.sqrtRatioX96
 		);
 
 		// Determine the trade direction
-		bool _zeroForOne;
 		if (amount1Desired == 0) {
-			_zeroForOne = true;
+			vars.zeroForOne = true;
 		} else {
-			_zeroForOne = _amountsDirection(amount0Desired, amount1Desired, amount0, amount1);
+			vars.zeroForOne = _amountsDirection(
+				amount0Desired,
+				amount1Desired,
+				vars.amount0,
+				vars.amount1
+			);
 		}
 
 		vars.uniPoolFee = IUniswapV3Pool(pool).fee();
 
 		// Determine the amount to swap, it is not 100% precise but is a very good approximation
-		uint256 _amountSpecified = _zeroForOne
-			? ((amount0Desired - amount0) * basisOne) / (2 * basisOne + vars.uniPoolFee)
-			: ((amount1Desired - amount1) * basisOne) / (2 * basisOne + vars.uniPoolFee);
+		vars.amountSpecified = vars.zeroForOne
+			? ((amount0Desired - vars.amount0) * (basisOne + vars.uniPoolFee)) /
+				(2 * basisOne + vars.uniPoolFee)
+			: ((amount1Desired - vars.amount1) * (basisOne + vars.uniPoolFee)) /
+				(2 * basisOne + vars.uniPoolFee);
 
-		if (_amountSpecified > 0) {
+		if (vars.amountSpecified > 0) {
 			(vars.amount0Delta, vars.amount1Delta) = _swap(
 				pool,
-				_amountSpecified,
-				_zeroForOne,
+				vars.amountSpecified,
+				vars.zeroForOne,
 				maxSwapSlippage,
 				data
 			);
 			finalAmount0 = uint256(SafeCast.toInt256(amount0Desired) - vars.amount0Delta);
 			finalAmount1 = uint256(SafeCast.toInt256(amount1Desired) - vars.amount1Delta);
 		} else {
-			return (amount0, amount1);
+			return (vars.amount0, vars.amount1);
 		}
 	}
 
@@ -188,14 +225,16 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 		uint256 _slippageMax = maxSwapSlippage == 0 ? slippageUserMax : maxSwapSlippage;
 
 		(uint160 _sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
-		uint256 _slippage = zeroForOne ? (basisOne - _slippageMax) : (basisOne + _slippageMax);
+		uint256 _slippageSqrt = zeroForOne
+			? prbSqrt(basisOne - _slippageMax)
+			: prbSqrt(basisOne + _slippageMax);
 
 		return
 			IUniswapV3Pool(pool).swap(
 				address(this),
 				zeroForOne, // Swap direction, true: token0 -> token1, false: token1 -> token0
 				int256(amountIn),
-				uint160(uint256((_sqrtPriceX96 * _slippage) / basisOne)), // sqrtPriceLimitX96
+				uint160(uint256((_sqrtPriceX96 * _slippageSqrt) / basisOneSqrt)), // sqrtPriceLimitX96
 				data
 			);
 	}
