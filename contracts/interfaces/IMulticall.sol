@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+// solhint-disable
 pragma solidity >=0.7.5;
 pragma abicoder v2;
 
@@ -11,3 +12,4 @@ interface IMulticall {
 	/// @return results The results from each of the calls passed in via data
 	function multicall(bytes[] calldata data) external payable returns (bytes[] memory results);
 }
+

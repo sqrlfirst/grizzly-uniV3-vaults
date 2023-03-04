@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
+// solhint-disable
 pragma solidity >=0.5.0;
 
 import { FullMath } from "./FullMath.sol";
@@ -127,3 +128,4 @@ library LiquidityAmounts {
 		}
 	}
 }
+
