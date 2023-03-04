@@ -673,12 +673,16 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 
 		(uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
 
-		uint160 diff = avgSqrtRatioX96 > sqrtPriceX96
-			? avgSqrtRatioX96 - sqrtPriceX96
-			: sqrtPriceX96 - avgSqrtRatioX96;
+		uint256 oracleSlippageSqrt = avgSqrtRatioX96 < sqrtPriceX96
+			? prbSqrt(basisOne + oracleSlippage)
+			: prbSqrt(basisOne - oracleSlippage);
 
-		uint160 maxSlippage = (avgSqrtRatioX96 * oracleSlippage) / 10000;
+		uint160 limitSqrtRatioX96 = uint160((avgSqrtRatioX96 * oracleSlippageSqrt) / basisOneSqrt);
 
-		require(diff < maxSlippage, "high slippage");
+		bool correctBound = avgSqrtRatioX96 < sqrtPriceX96
+			? sqrtPriceX96 < limitSqrtRatioX96
+			: sqrtPriceX96 > limitSqrtRatioX96;
+
+		require(correctBound, "high slippage");
 	}
 }
