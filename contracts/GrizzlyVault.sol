@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.8.18;
 
-pragma solidity 0.8.4;
-
+// solhint-disable max-line-length
 import { IUniswapV3MintCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import { IUniswapV3SwapCallback } from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import { GrizzlyVaultStorage } from "./abstract/GrizzlyVaultStorage.sol";
@@ -9,9 +9,8 @@ import { TickMath } from "./uniswap/TickMath.sol";
 import { IERC20, SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import { prbSqrt } from "@prb/math/src/Common.sol";
 import { FullMath, LiquidityAmounts } from "./uniswap/LiquidityAmounts.sol";
-
-import "hardhat/console.sol";
 
 contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, GrizzlyVaultStorage {
 	using SafeERC20 for IERC20;
@@ -107,8 +106,6 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 				sqrtRatioX96
 			);
 		}
-		console.log("MINT AMOUNT", mintAmount);
-		console.log("AMOUNTS", amount0, amount1);
 
 		// Transfer amounts owed to contract
 		if (amount0 > 0) {
@@ -128,11 +125,10 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 	}
 
 	/// @notice Burn Grizzly Vault tokens (fractional shares of a UniV3 position) and receive tokens
-	/// @dev onlyToken0 and onlyToken1 can not be both true, but can be both false
-	/// In the case of both false, the user receives the proportional token0 and token1 amounts
 	/// @param burnAmount The number of Grizzly Vault tokens to burn
-	/// @param onlyToken0 If true the user zaps out with only token0
-	/// @param onlyToken1  If true the user zaps out with only token1
+	/// @param maxSwapSlippage The maximum slippage authorized by user
+	/// @param outputToken  If 0 zaps out with only token0, if 1 zaps out with only token 1,
+	/// if everything else it zaps out with both tokens
 	/// @param receiver The account to receive the underlying amounts of token0 and token1
 	/// @return amount0 Amount of token0 transferred to receiver for burning `burnAmount`
 	/// @return amount1 Amount of token1 transferred to receiver for burning `burnAmount`
@@ -140,15 +136,14 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 	// solhint-disable-next-line function-max-lines
 	function burn(
 		uint256 burnAmount,
-		bool onlyToken0,
-		bool onlyToken1,
+		uint256 maxSwapSlippage,
+		uint8 outputToken,
 		address receiver
 	) external nonReentrant returns (uint256 amount0, uint256 amount1, uint128 liquidityBurned) {
 		require(burnAmount > 0, "burn 0");
+		require(maxSwapSlippage < basisOne, "max slippage too high");
 
-		_validateValues(onlyToken0, onlyToken1);
-
-		LocalVariables_burn memory vars;
+		LocalVariablesBurn memory vars;
 
 		vars.totalSupply = totalSupply();
 
@@ -186,12 +181,12 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 			);
 
 		// ZapOut logic Note test properly amounts
-		if (onlyToken0) {
-			(vars.amount0Delta, vars.amount1Delta) = _swap(amount1, false, slippageUserMax);
+		if (outputToken == 0) {
+			(vars.amount0Delta, vars.amount1Delta) = _swap(amount1, false, maxSwapSlippage);
 			amount0 = uint256(SafeCast.toInt256(amount0) - vars.amount0Delta);
 			amount1 = uint256(SafeCast.toInt256(amount1) - vars.amount1Delta);
-		} else if (onlyToken1) {
-			(vars.amount0Delta, vars.amount1Delta) = _swap(amount0, true, slippageUserMax);
+		} else if (outputToken == 1) {
+			(vars.amount0Delta, vars.amount1Delta) = _swap(amount0, true, maxSwapSlippage);
 			amount0 = uint256(SafeCast.toInt256(amount0) - vars.amount0Delta);
 			amount1 = uint256(SafeCast.toInt256(amount1) - vars.amount1Delta);
 		}
@@ -327,7 +322,7 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 
 	/// @notice Compute total underlying holdings of the Grizzly Vault token supply
 	/// Includes current liquidity invested in uniswap position, current fees earned
-	/// and any uninvested leftover (but does not include manager or gelato fees accrued)
+	/// and any uninvested leftover (but does not include manager or Grizzly fees accrued)
 	/// @return amount0Current current total underlying balance of token0
 	/// @return amount1Current current total underlying balance of token1
 	function getUnderlyingBalances()
@@ -431,8 +426,8 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 
 		// Determine the amount to swap, it is not 100% precise but is a very good approximation
 		uint256 _amountSpecified = _zeroForOne
-			? (amount0Desired - (((amount0 * (basisOne + uniPoolFee / 2)) / basisOne))) / 2
-			: (amount1Desired - (((amount1 * (basisOne + uniPoolFee / 2)) / basisOne))) / 2;
+			? ((amount0Desired - amount0) * (basisOne + uniPoolFee)) / (2 * basisOne + uniPoolFee)
+			: ((amount1Desired - amount1) * (basisOne + uniPoolFee)) / (2 * basisOne + uniPoolFee);
 
 		if (_amountSpecified > 0) {
 			(int256 amount0Delta, int256 amount1Delta) = _swap(
@@ -465,13 +460,17 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		uint256 slippageMax
 	) internal returns (int256, int256) {
 		(uint160 _sqrtPriceX96, , , , , , ) = pool.slot0();
-		uint256 _slippage = zeroForOne ? (basisOne - slippageMax) : (basisOne + slippageMax);
+
+		uint256 _slippageMax = slippageMax == 0 ? slippageUserMax : slippageMax;
+		uint256 _slippageSqrt = zeroForOne
+			? prbSqrt(basisOne - _slippageMax)
+			: prbSqrt(basisOne + _slippageMax);
 		return
 			pool.swap(
 				address(this),
 				zeroForOne, // Swap direction, true: token0 -> token1, false: token1 -> token0
-				int256(amountIn),
-				uint160(uint256((_sqrtPriceX96 * _slippage) / basisOne)), // sqrtPriceLimitX96
+				SafeCast.toInt256(amountIn),
+				uint160(uint256((_sqrtPriceX96 * _slippageSqrt) / basisOneSqrt)), // sqrtPriceLimitX96
 				abi.encode(0)
 			);
 	}
@@ -490,8 +489,8 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		uint256 rawFee0,
 		uint256 rawFee1
 	) internal returns (uint256 fee0, uint256 fee1) {
-		uint256 managerFee0 = (rawFee0 * managerFeeBPS) / basisOne;
-		uint256 managerFee1 = (rawFee1 * managerFeeBPS) / basisOne;
+		uint256 managerFee0 = (rawFee0 * managerFee) / basisOne;
+		uint256 managerFee1 = (rawFee1 * managerFee) / basisOne;
 
 		managerBalance0 += managerFee0;
 		managerBalance1 += managerFee1;
@@ -527,8 +526,8 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		uint256 fee1 = _computeFeesEarned(false, feeGrowthInside1Last, tick, liquidity, ticks) +
 			uint256(tokensOwed1);
 
-		fee0 = (fee0 * (basisOne - managerFeeBPS)) / basisOne;
-		fee1 = (fee1 * (basisOne - managerFeeBPS)) / basisOne;
+		fee0 = (fee0 * (basisOne - managerFee)) / basisOne;
+		fee1 = (fee1 * (basisOne - managerFee)) / basisOne;
 
 		// Add any leftover in contract to current holdings
 		amount0Current += fee0 + token0.balanceOf(address(this)) - managerBalance0;
@@ -565,10 +564,6 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 				amount0,
 				amount1
 			);
-	}
-
-	function _validateValues(bool onlyToken0, bool onlyToken1) internal view {
-		if (onlyToken0 && onlyToken1) revert("invalid inputs");
 	}
 
 	function _computeMintAmounts(
@@ -682,7 +677,7 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 			? avgSqrtRatioX96 - sqrtPriceX96
 			: sqrtPriceX96 - avgSqrtRatioX96;
 
-		uint160 maxSlippage = (avgSqrtRatioX96 * oracleSlippageBPS) / 10000;
+		uint160 maxSlippage = (avgSqrtRatioX96 * oracleSlippage) / 10000;
 
 		require(diff < maxSlippage, "high slippage");
 	}
