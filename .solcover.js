@@ -1,10 +1,11 @@
 module.exports = {
   skipFiles: [
     "__mocks__",
-    "abstract/GUni.sol",
+    "abstract/GrizzlyVaultStorage.sol",
     "abstract/OwnableUninitialized.sol",
     "interfaces",
-    "vendor",
+    "uniswap",
     "node_modules",
+    "contracts"
   ],
 };

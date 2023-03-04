@@ -1,8 +1,6 @@
 cache
 coverage
-coverage
 dist
 typechain
-contracts
 test
 deploy
