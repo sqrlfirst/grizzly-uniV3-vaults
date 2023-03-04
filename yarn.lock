@@ -697,71 +697,71 @@
     mcl-wasm "^0.7.1"
     rustbn.js "~0.2.0"
 
-"@nomicfoundation/solidity-analyzer-darwin-arm64@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-darwin-arm64/-/solidity-analyzer-darwin-arm64-0.1.0.tgz#83a7367342bd053a76d04bbcf4f373fef07cf760"
-  integrity sha512-vEF3yKuuzfMHsZecHQcnkUrqm8mnTWfJeEVFHpg+cO+le96xQA4lAJYdUan8pXZohQxv1fSReQsn4QGNuBNuCw==
+"@nomicfoundation/solidity-analyzer-darwin-arm64@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-darwin-arm64/-/solidity-analyzer-darwin-arm64-0.1.1.tgz#4c858096b1c17fe58a474fe81b46815f93645c15"
+  integrity sha512-KcTodaQw8ivDZyF+D76FokN/HdpgGpfjc/gFCImdLUyqB6eSWVaZPazMbeAjmfhx3R0zm/NYVzxwAokFKgrc0w==
 
-"@nomicfoundation/solidity-analyzer-darwin-x64@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-darwin-x64/-/solidity-analyzer-darwin-x64-0.1.0.tgz#1225f7da647ae1ad25a87125664704ecc0af6ccc"
-  integrity sha512-dlHeIg0pTL4dB1l9JDwbi/JG6dHQaU1xpDK+ugYO8eJ1kxx9Dh2isEUtA4d02cQAl22cjOHTvifAk96A+ItEHA==
+"@nomicfoundation/solidity-analyzer-darwin-x64@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-darwin-x64/-/solidity-analyzer-darwin-x64-0.1.1.tgz#6e25ccdf6e2d22389c35553b64fe6f3fdaec432c"
+  integrity sha512-XhQG4BaJE6cIbjAVtzGOGbK3sn1BO9W29uhk9J8y8fZF1DYz0Doj8QDMfpMu+A6TjPDs61lbsmeYodIDnfveSA==
 
-"@nomicfoundation/solidity-analyzer-freebsd-x64@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-freebsd-x64/-/solidity-analyzer-freebsd-x64-0.1.0.tgz#dbc052dcdfd50ae50fd5ae1788b69b4e0fa40040"
-  integrity sha512-WFCZYMv86WowDA4GiJKnebMQRt3kCcFqHeIomW6NMyqiKqhK1kIZCxSLDYsxqlx396kKLPN1713Q1S8tu68GKg==
+"@nomicfoundation/solidity-analyzer-freebsd-x64@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-freebsd-x64/-/solidity-analyzer-freebsd-x64-0.1.1.tgz#0a224ea50317139caeebcdedd435c28a039d169c"
+  integrity sha512-GHF1VKRdHW3G8CndkwdaeLkVBi5A9u2jwtlS7SLhBc8b5U/GcoL39Q+1CSO3hYqePNP+eV5YI7Zgm0ea6kMHoA==
 
-"@nomicfoundation/solidity-analyzer-linux-arm64-gnu@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-linux-arm64-gnu/-/solidity-analyzer-linux-arm64-gnu-0.1.0.tgz#e6b2eea633995b557e74e881d2a43eab4760903d"
-  integrity sha512-DTw6MNQWWlCgc71Pq7CEhEqkb7fZnS7oly13pujs4cMH1sR0JzNk90Mp1zpSCsCs4oKan2ClhMlLKtNat/XRKQ==
+"@nomicfoundation/solidity-analyzer-linux-arm64-gnu@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-linux-arm64-gnu/-/solidity-analyzer-linux-arm64-gnu-0.1.1.tgz#dfa085d9ffab9efb2e7b383aed3f557f7687ac2b"
+  integrity sha512-g4Cv2fO37ZsUENQ2vwPnZc2zRenHyAxHcyBjKcjaSmmkKrFr64yvzeNO8S3GBFCo90rfochLs99wFVGT/0owpg==
 
-"@nomicfoundation/solidity-analyzer-linux-arm64-musl@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-linux-arm64-musl/-/solidity-analyzer-linux-arm64-musl-0.1.0.tgz#af81107f5afa794f19988a368647727806e18dc4"
-  integrity sha512-wUpUnR/3GV5Da88MhrxXh/lhb9kxh9V3Jya2NpBEhKDIRCDmtXMSqPMXHZmOR9DfCwCvG6vLFPr/+YrPCnUN0w==
+"@nomicfoundation/solidity-analyzer-linux-arm64-musl@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-linux-arm64-musl/-/solidity-analyzer-linux-arm64-musl-0.1.1.tgz#c9e06b5d513dd3ab02a7ac069c160051675889a4"
+  integrity sha512-WJ3CE5Oek25OGE3WwzK7oaopY8xMw9Lhb0mlYuJl/maZVo+WtP36XoQTb7bW/i8aAdHW5Z+BqrHMux23pvxG3w==
 
-"@nomicfoundation/solidity-analyzer-linux-x64-gnu@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-linux-x64-gnu/-/solidity-analyzer-linux-x64-gnu-0.1.0.tgz#6877e1da1a06a9f08446070ab6e0a5347109f868"
-  integrity sha512-lR0AxK1x/MeKQ/3Pt923kPvwigmGX3OxeU5qNtQ9pj9iucgk4PzhbS3ruUeSpYhUxG50jN4RkIGwUMoev5lguw==
+"@nomicfoundation/solidity-analyzer-linux-x64-gnu@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-linux-x64-gnu/-/solidity-analyzer-linux-x64-gnu-0.1.1.tgz#8d328d16839e52571f72f2998c81e46bf320f893"
+  integrity sha512-5WN7leSr5fkUBBjE4f3wKENUy9HQStu7HmWqbtknfXkkil+eNWiBV275IOlpXku7v3uLsXTOKpnnGHJYI2qsdA==
 
-"@nomicfoundation/solidity-analyzer-linux-x64-musl@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-linux-x64-musl/-/solidity-analyzer-linux-x64-musl-0.1.0.tgz#bb6cd83a0c259eccef4183796b6329a66cf7ebd9"
-  integrity sha512-A1he/8gy/JeBD3FKvmI6WUJrGrI5uWJNr5Xb9WdV+DK0F8msuOqpEByLlnTdLkXMwW7nSl3awvLezOs9xBHJEg==
+"@nomicfoundation/solidity-analyzer-linux-x64-musl@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-linux-x64-musl/-/solidity-analyzer-linux-x64-musl-0.1.1.tgz#9b49d0634b5976bb5ed1604a1e1b736f390959bb"
+  integrity sha512-KdYMkJOq0SYPQMmErv/63CwGwMm5XHenEna9X9aB8mQmhDBrYrlAOSsIPgFCUSL0hjxE3xHP65/EPXR/InD2+w==
 
-"@nomicfoundation/solidity-analyzer-win32-arm64-msvc@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-win32-arm64-msvc/-/solidity-analyzer-win32-arm64-msvc-0.1.0.tgz#9d4bca1cc9a1333fde985675083b0b7d165f6076"
-  integrity sha512-7x5SXZ9R9H4SluJZZP8XPN+ju7Mx+XeUMWZw7ZAqkdhP5mK19I4vz3x0zIWygmfE8RT7uQ5xMap0/9NPsO+ykw==
+"@nomicfoundation/solidity-analyzer-win32-arm64-msvc@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-win32-arm64-msvc/-/solidity-analyzer-win32-arm64-msvc-0.1.1.tgz#e2867af7264ebbcc3131ef837878955dd6a3676f"
+  integrity sha512-VFZASBfl4qiBYwW5xeY20exWhmv6ww9sWu/krWSesv3q5hA0o1JuzmPHR4LPN6SUZj5vcqci0O6JOL8BPw+APg==
 
-"@nomicfoundation/solidity-analyzer-win32-ia32-msvc@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-win32-ia32-msvc/-/solidity-analyzer-win32-ia32-msvc-0.1.0.tgz#0db5bfc6aa952bea4098d8d2c8947b4e5c4337ee"
-  integrity sha512-m7w3xf+hnE774YRXu+2mGV7RiF3QJtUoiYU61FascCkQhX3QMQavh7saH/vzb2jN5D24nT/jwvaHYX/MAM9zUw==
+"@nomicfoundation/solidity-analyzer-win32-ia32-msvc@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-win32-ia32-msvc/-/solidity-analyzer-win32-ia32-msvc-0.1.1.tgz#0685f78608dd516c8cdfb4896ed451317e559585"
+  integrity sha512-JnFkYuyCSA70j6Si6cS1A9Gh1aHTEb8kOTBApp/c7NRTFGNMH8eaInKlyuuiIbvYFhlXW4LicqyYuWNNq9hkpQ==
 
-"@nomicfoundation/solidity-analyzer-win32-x64-msvc@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-win32-x64-msvc/-/solidity-analyzer-win32-x64-msvc-0.1.0.tgz#2e0f39a2924dcd77db6b419828595e984fabcb33"
-  integrity sha512-xCuybjY0sLJQnJhupiFAXaek2EqF0AP0eBjgzaalPXSNvCEN6ZYHvUzdA50ENDVeSYFXcUsYf3+FsD3XKaeptA==
+"@nomicfoundation/solidity-analyzer-win32-x64-msvc@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-win32-x64-msvc/-/solidity-analyzer-win32-x64-msvc-0.1.1.tgz#c9a44f7108646f083b82e851486e0f6aeb785836"
+  integrity sha512-HrVJr6+WjIXGnw3Q9u6KQcbZCtk0caVWhCdFADySvRyUxJ8PnzlaP+MhwNE8oyT8OZ6ejHBRrrgjSqDCFXGirw==
 
 "@nomicfoundation/solidity-analyzer@^0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer/-/solidity-analyzer-0.1.0.tgz#e5ddc43ad5c0aab96e5054520d8e16212e125f50"
-  integrity sha512-xGWAiVCGOycvGiP/qrlf9f9eOn7fpNbyJygcB0P21a1MDuVPlKt0Srp7rvtBEutYQ48ouYnRXm33zlRnlTOPHg==
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer/-/solidity-analyzer-0.1.1.tgz#f5f4d36d3f66752f59a57e7208cd856f3ddf6f2d"
+  integrity sha512-1LMtXj1puAxyFusBgUIy5pZk3073cNXYnXUpuNKFghHbIit/xZgbk0AokpUADbNm3gyD6bFWl3LRFh3dhVdREg==
   optionalDependencies:
-    "@nomicfoundation/solidity-analyzer-darwin-arm64" "0.1.0"
-    "@nomicfoundation/solidity-analyzer-darwin-x64" "0.1.0"
-    "@nomicfoundation/solidity-analyzer-freebsd-x64" "0.1.0"
-    "@nomicfoundation/solidity-analyzer-linux-arm64-gnu" "0.1.0"
-    "@nomicfoundation/solidity-analyzer-linux-arm64-musl" "0.1.0"
-    "@nomicfoundation/solidity-analyzer-linux-x64-gnu" "0.1.0"
-    "@nomicfoundation/solidity-analyzer-linux-x64-musl" "0.1.0"
-    "@nomicfoundation/solidity-analyzer-win32-arm64-msvc" "0.1.0"
-    "@nomicfoundation/solidity-analyzer-win32-ia32-msvc" "0.1.0"
-    "@nomicfoundation/solidity-analyzer-win32-x64-msvc" "0.1.0"
+    "@nomicfoundation/solidity-analyzer-darwin-arm64" "0.1.1"
+    "@nomicfoundation/solidity-analyzer-darwin-x64" "0.1.1"
+    "@nomicfoundation/solidity-analyzer-freebsd-x64" "0.1.1"
+    "@nomicfoundation/solidity-analyzer-linux-arm64-gnu" "0.1.1"
+    "@nomicfoundation/solidity-analyzer-linux-arm64-musl" "0.1.1"
+    "@nomicfoundation/solidity-analyzer-linux-x64-gnu" "0.1.1"
+    "@nomicfoundation/solidity-analyzer-linux-x64-musl" "0.1.1"
+    "@nomicfoundation/solidity-analyzer-win32-arm64-msvc" "0.1.1"
+    "@nomicfoundation/solidity-analyzer-win32-ia32-msvc" "0.1.1"
+    "@nomicfoundation/solidity-analyzer-win32-x64-msvc" "0.1.1"
 
 "@nomiclabs/hardhat-ethers@npm:hardhat-deploy-ethers":
   version "0.3.0-beta.13"
@@ -803,6 +803,11 @@
   version "4.8.1"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.8.1.tgz#709cfc4bbb3ca9f4460d60101f15dac6b7a2d5e4"
   integrity sha512-xQ6eUZl+RDyb/FiZe1h+U7qr/f4p/SrTSQcTPH2bjur3C5DbuW/zFgCU/b1P/xcIaEqJep+9ju4xDRi3rmChdQ==
+
+"@prb/math@^3.3.0":
+  version "3.3.0"
+  resolved "https://registry.yarnpkg.com/@prb/math/-/math-3.3.0.tgz#d1680b967f9dc77162e867649e93d7785df77022"
+  integrity sha512-NlWr/LqCsz/4HZTBlYkp5UCjMrArejSp2gtmJf54McG1aYWRXQO9UmbRmyhQxSOSwlLw34tJsROFFLns8R9JHg==
 
 "@resolver-engine/core@^0.3.3":
   version "0.3.3"
@@ -952,6 +957,13 @@
   version "0.15.0"
   resolved "https://registry.yarnpkg.com/@solidity-parser/parser/-/parser-0.15.0.tgz#1d359be40be84f174dd616ccfadcf43346c6bf63"
   integrity sha512-5UFJJTzWi1hgFk6aGCZ5rxG2DJkCJOzJ74qg7UkWSNCDSigW+CJLoYUb5bLiKrtI34Nr9rpFSUNHfkqtlL+N/w==
+  dependencies:
+    antlr4ts "^0.5.0-alpha.4"
+
+"@solidity-parser/parser@^0.16.0":
+  version "0.16.0"
+  resolved "https://registry.yarnpkg.com/@solidity-parser/parser/-/parser-0.16.0.tgz#1fb418c816ca1fc3a1e94b08bcfe623ec4e1add4"
+  integrity sha512-ESipEcHyRHg4Np4SqBCfcXwyxxna1DgFVz69bgpLV8vzl/NP1DtcKsJ4dJZXWQhY/Z4J2LeKBiOkOVZn9ct33Q==
   dependencies:
     antlr4ts "^0.5.0-alpha.4"
 
@@ -1105,15 +1117,20 @@
     "@types/node" "*"
     form-data "^3.0.0"
 
-"@types/node@*", "@types/node@^18.3.0":
-  version "18.14.0"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.14.0.tgz#94c47b9217bbac49d4a67a967fdcdeed89ebb7d0"
-  integrity sha512-5EWrvLmglK+imbCJY0+INViFWUHg1AHel1sq4ZVSfdcNqGy9Edv3UB9IIzzg+xPaUcAgZYcfVs2fBcwDeZzU0A==
+"@types/node@*":
+  version "18.14.6"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.14.6.tgz#ae1973dd2b1eeb1825695bb11ebfb746d27e3e93"
+  integrity sha512-93+VvleD3mXwlLI/xASjw0FzKcwzl3OdTCzm1LaRfqgS21gfFtK3zDXM5Op9TeeMsJVOaJ2VRDpT9q4Y3d0AvA==
 
 "@types/node@^12.12.6":
   version "12.20.55"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-12.20.55.tgz#c329cbd434c42164f846b909bd6f85b5537f6240"
   integrity sha512-J8xLz7q2OFulZ2cyGTLE1TbbZcjpno7FaN6zdJNrgAdrJ+DZzh/uFR6YrTb4C+nXakvud8Q4+rbhoIWlYQbUFQ==
+
+"@types/node@^18.3.0":
+  version "18.14.0"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.14.0.tgz#94c47b9217bbac49d4a67a967fdcdeed89ebb7d0"
+  integrity sha512-5EWrvLmglK+imbCJY0+INViFWUHg1AHel1sq4ZVSfdcNqGy9Edv3UB9IIzzg+xPaUcAgZYcfVs2fBcwDeZzU0A==
 
 "@types/parse-json@^4.0.0":
   version "4.0.0"
@@ -3080,9 +3097,9 @@ cosmiconfig@^7.0.1:
     yaml "^1.10.0"
 
 cosmiconfig@^8.0.0:
-  version "8.0.0"
-  resolved "https://registry.yarnpkg.com/cosmiconfig/-/cosmiconfig-8.0.0.tgz#e9feae014eab580f858f8a0288f38997a7bebe97"
-  integrity sha512-da1EafcpH6b/TD8vDRaWV7xFINlHlF6zKsGwS1TsuVJTZRkquaS5HTMq7uq6h31619QjbsYl21gVDOm32KM1vQ==
+  version "8.1.0"
+  resolved "https://registry.yarnpkg.com/cosmiconfig/-/cosmiconfig-8.1.0.tgz#947e174c796483ccf0a48476c24e4fefb7e1aea8"
+  integrity sha512-0tLZ9URlPGU7JsKq0DQOQ3FoRsYX8xDZ7xMiATQfaiGMz7EHowNkbU9u1coAOmnh9p/1ySpm0RB3JNWRXM5GCg==
   dependencies:
     import-fresh "^3.2.1"
     js-yaml "^4.1.0"
@@ -5126,6 +5143,15 @@ hardhat-deploy@^0.11.23:
     qs "^6.9.4"
     zksync-web3 "^0.8.1"
 
+hardhat-ignore-warnings@^0.2.8:
+  version "0.2.8"
+  resolved "https://registry.yarnpkg.com/hardhat-ignore-warnings/-/hardhat-ignore-warnings-0.2.8.tgz#a31306ecbc0b97b809274dddd2103aa306ef2a46"
+  integrity sha512-vPX94rJyTzYsCOzGIYdOcJgn3iQI6qa+CI9ZZfgDhdXJpda8ljpOT7bdUKAYC4LyoP0Z5fWTmupXoPaQrty0gw==
+  dependencies:
+    minimatch "^5.1.0"
+    node-interval-tree "^2.0.1"
+    solidity-comments "^0.0.2"
+
 hardhat-tracer@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/hardhat-tracer/-/hardhat-tracer-2.0.0.tgz#ae8a4404cc350078a61d782898c6d4d3f3abf455"
@@ -5133,10 +5159,10 @@ hardhat-tracer@^2.0.0:
   dependencies:
     ethers "^5.6.1"
 
-hardhat@^2.12.7:
-  version "2.12.7"
-  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.12.7.tgz#d8de2dc32e9a2956d53cf26ef4cd5857e57a3138"
-  integrity sha512-voWoN6zn5d8BOEaczSyK/1PyfdeOeI3SbGCFb36yCHTJUt6OIqLb+ZDX30VhA1UsYKzLqG7UnWl3fKJUuANc6A==
+hardhat@^2.13.0:
+  version "2.13.0"
+  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.13.0.tgz#d52a0ec9b733a651687e5b1c1b0ee9a11a30f3d0"
+  integrity sha512-ZlzBOLML1QGlm6JWyVAG8lVTEAoOaVm1in/RU2zoGAnYEoD1Rp4T+ZMvrLNhHaaeS9hfjJ1gJUBfiDr4cx+htQ==
   dependencies:
     "@ethersproject/abi" "^5.1.2"
     "@metamask/eth-sig-util" "^4.0.0"
@@ -6731,7 +6757,7 @@ minimatch@5.0.1:
   dependencies:
     brace-expansion "^2.0.1"
 
-minimatch@^5.0.1:
+minimatch@^5.0.1, minimatch@^5.1.0:
   version "5.1.6"
   resolved "https://registry.yarnpkg.com/minimatch/-/minimatch-5.1.6.tgz#1cfcb8cf5522ea69952cd2af95ae09477f122a96"
   integrity sha512-lKwV/1brpG6mBUFHtb7NUmtABCb2WZZmm2wNiOA5hAb8VdCS4B3dtMWyvcoViccwAW/COERjXLt0zP1zXUN26g==
@@ -7036,6 +7062,13 @@ node-gyp-build@^4.2.0, node-gyp-build@^4.3.0:
   version "4.6.0"
   resolved "https://registry.yarnpkg.com/node-gyp-build/-/node-gyp-build-4.6.0.tgz#0c52e4cbf54bbd28b709820ef7b6a3c2d6209055"
   integrity sha512-NTZVKn9IylLwUzaKjkas1e4u2DLNcV4rdYagA4PWdPwW87Bi7z+BznyKSRwS/761tV/lzCGXplWsiaMjLqP2zQ==
+
+node-interval-tree@^2.0.1:
+  version "2.1.2"
+  resolved "https://registry.yarnpkg.com/node-interval-tree/-/node-interval-tree-2.1.2.tgz#316e380db08d1c0de0a620d551f0327e8397dad8"
+  integrity sha512-bJ9zMDuNGzVQg1xv0bCPzyEDxHgbrx7/xGj6CDokvizZZmastPsOh0JJLuY8wA5q2SfX1TLNMk7XNV8WxbGxzA==
+  dependencies:
+    shallowequal "^1.1.0"
 
 nofilter@^3.1.0:
   version "3.1.0"
@@ -7577,16 +7610,16 @@ prettier-linter-helpers@^1.0.0:
   dependencies:
     fast-diff "^1.1.2"
 
-prettier-plugin-solidity@^1.0.0-beta.10:
-  version "1.1.2"
-  resolved "https://registry.yarnpkg.com/prettier-plugin-solidity/-/prettier-plugin-solidity-1.1.2.tgz#452be4df925a4b16a974a04235839c9f56c2d10d"
-  integrity sha512-KC5oNbFJfyBaFiO0kl56J6AXnDmr9tUlBV1iqo864x4KQrKYKaBZvW9jhT2oC0NHoNp7/GoMJNxqL8pp8k7C/g==
+prettier-plugin-solidity@^1.1.3:
+  version "1.1.3"
+  resolved "https://registry.yarnpkg.com/prettier-plugin-solidity/-/prettier-plugin-solidity-1.1.3.tgz#9a35124f578404caf617634a8cab80862d726cba"
+  integrity sha512-fQ9yucPi2sBbA2U2Xjh6m4isUTJ7S7QLc/XDDsktqqxYfTwdYKJ0EnnywXHwCGAaYbQNK+HIYPL1OemxuMsgeg==
   dependencies:
-    "@solidity-parser/parser" "^0.15.0"
+    "@solidity-parser/parser" "^0.16.0"
     semver "^7.3.8"
     solidity-comments-extractor "^0.0.7"
 
-prettier@^2.1.2, prettier@^2.3.0, prettier@^2.3.1, prettier@^2.8.3:
+prettier@^2.1.2, prettier@^2.3.1, prettier@^2.8.3, prettier@^2.8.4:
   version "2.8.4"
   resolved "https://registry.yarnpkg.com/prettier/-/prettier-2.8.4.tgz#34dd2595629bfbb79d344ac4a91ff948694463c3"
   integrity sha512-vIS4Rlc2FNh0BySk3Wkd6xmwxB0FpOndW5fisM5H8hsZSxU2VWVB5CWIkIjWvrHjIhxk2g3bfMKM87zNTrZddw==
@@ -7841,10 +7874,19 @@ readable-stream@^2.0.0, readable-stream@^2.0.5, readable-stream@^2.2.2, readable
     string_decoder "~1.1.1"
     util-deprecate "~1.0.1"
 
-readable-stream@^3.0.6, readable-stream@^3.6.0:
+readable-stream@^3.0.6:
   version "3.6.0"
   resolved "https://registry.yarnpkg.com/readable-stream/-/readable-stream-3.6.0.tgz#337bbda3adc0706bd3e024426a286d4b4b2c9198"
   integrity sha512-BViHy7LKeTz4oNnkcLJ+lVSL6vpiFeX6/d3oSH8zCW7UxP2onchk+vTGB143xuFjHS3deTgkKoXXymXqymiIdA==
+  dependencies:
+    inherits "^2.0.3"
+    string_decoder "^1.1.1"
+    util-deprecate "^1.0.1"
+
+readable-stream@^3.6.0:
+  version "3.6.1"
+  resolved "https://registry.yarnpkg.com/readable-stream/-/readable-stream-3.6.1.tgz#f9f9b5f536920253b3d26e7660e7da4ccff9bb62"
+  integrity sha512-+rQmrWMYGA90yenhTYsLWAsLsqVC8osOw6PKE1HDYiO0gdPeKe/xDHNzIAIn4C91YQ6oenEhfYqqc1883qHbjQ==
   dependencies:
     inherits "^2.0.3"
     string_decoder "^1.1.1"
@@ -8359,6 +8401,11 @@ sha.js@^2.4.0, sha.js@^2.4.8:
     inherits "^2.0.1"
     safe-buffer "^5.0.1"
 
+shallowequal@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/shallowequal/-/shallowequal-1.1.0.tgz#188d521de95b9087404fd4dcb68b13df0ae4e7f8"
+  integrity sha512-y0m1JoUZSlPAjXVtPPW70aZWfIL/dSP7AFkRnniLCrK/8MDKog3TySTBmckD+RObVxH0v4Tox67+F14PdED2oQ==
+
 shebang-command@^1.2.0:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/shebang-command/-/shebang-command-1.2.0.tgz#44aac65b695b03398968c39f363fee5deafdf1ea"
@@ -8530,7 +8577,7 @@ solhint-plugin-prettier@^0.0.5:
   dependencies:
     prettier-linter-helpers "^1.0.0"
 
-solhint@^3.3.4:
+solhint@^3.4.0:
   version "3.4.0"
   resolved "https://registry.yarnpkg.com/solhint/-/solhint-3.4.0.tgz#a7e4f2d73e679cb197a1ca5279aa7534bd323e4d"
   integrity sha512-FYEs/LoTxMsWFP/OGsEqR1CBDn3Bn7hrTWsgtjai17MzxITgearIdlo374KKZjjIycu8E2xBcJ+RSWeoBvQmkw==
@@ -8555,10 +8602,76 @@ solhint@^3.3.4:
   optionalDependencies:
     prettier "^2.8.3"
 
+solidity-comments-darwin-arm64@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/solidity-comments-darwin-arm64/-/solidity-comments-darwin-arm64-0.0.2.tgz#07d89176967d805d41177b38d4f7b16f17c4fa29"
+  integrity sha512-HidWkVLSh7v+Vu0CA7oI21GWP/ZY7ro8g8OmIxE8oTqyMwgMbE8F1yc58Sj682Hj199HCZsjmtn1BE4PCbLiGA==
+
+solidity-comments-darwin-x64@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/solidity-comments-darwin-x64/-/solidity-comments-darwin-x64-0.0.2.tgz#aaadbfcc08d9fdd1b564c8ce71d6ba50d67b1829"
+  integrity sha512-Zjs0Ruz6faBTPT6fBecUt6qh4CdloT8Bwoc0+qxRoTn9UhYscmbPQkUgQEbS0FQPysYqVzzxJB4h1Ofbf4wwtA==
+
 solidity-comments-extractor@^0.0.7:
   version "0.0.7"
   resolved "https://registry.yarnpkg.com/solidity-comments-extractor/-/solidity-comments-extractor-0.0.7.tgz#99d8f1361438f84019795d928b931f4e5c39ca19"
   integrity sha512-wciNMLg/Irp8OKGrh3S2tfvZiZ0NEyILfcRCXCD4mp7SgK/i9gzLfhY2hY7VMCQJ3kH9UB9BzNdibIVMchzyYw==
+
+solidity-comments-freebsd-x64@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/solidity-comments-freebsd-x64/-/solidity-comments-freebsd-x64-0.0.2.tgz#b2bbf4fe04daefb5e97d595ef5581d56b61ea275"
+  integrity sha512-8Qe4mpjuAxFSwZJVk7B8gAoLCdbtS412bQzBwk63L8dmlHogvE39iT70aAk3RHUddAppT5RMBunlPUCFYJ3ZTw==
+
+solidity-comments-linux-arm64-gnu@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/solidity-comments-linux-arm64-gnu/-/solidity-comments-linux-arm64-gnu-0.0.2.tgz#db9cd6c46606d46ce66ff781aa37d596bf06b5f1"
+  integrity sha512-spkb0MZZnmrP+Wtq4UxP+nyPAVRe82idOjqndolcNR0S9Xvu4ebwq+LvF4HiUgjTDmeiqYiFZQ8T9KGdLSIoIg==
+
+solidity-comments-linux-arm64-musl@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/solidity-comments-linux-arm64-musl/-/solidity-comments-linux-arm64-musl-0.0.2.tgz#e37d20bb18447a4761cb48c80909833874b60d27"
+  integrity sha512-guCDbHArcjE+JDXYkxx5RZzY1YF6OnAKCo+sTC5fstyW/KGKaQJNPyBNWuwYsQiaEHpvhW1ha537IvlGek8GqA==
+
+solidity-comments-linux-x64-gnu@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/solidity-comments-linux-x64-gnu/-/solidity-comments-linux-x64-gnu-0.0.2.tgz#19d09f0d52181ed2661d188ded0f9f22399eb17d"
+  integrity sha512-zIqLehBK/g7tvrFmQljrfZXfkEeLt2v6wbe+uFu6kH/qAHZa7ybt8Vc0wYcmjo2U0PeBm15d79ee3AkwbIjFdQ==
+
+solidity-comments-linux-x64-musl@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/solidity-comments-linux-x64-musl/-/solidity-comments-linux-x64-musl-0.0.2.tgz#ec1297208481c70bcdceae11ab1ef50c5a955553"
+  integrity sha512-R9FeDloVlFGTaVkOlELDVC7+1Tjx5WBPI5L8r0AGOPHK3+jOcRh6sKYpI+VskSPDc3vOO46INkpDgUXrKydlIw==
+
+solidity-comments-win32-arm64-msvc@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/solidity-comments-win32-arm64-msvc/-/solidity-comments-win32-arm64-msvc-0.0.2.tgz#48dc8a623f9e34a7c1ff62e406d67862d660ff04"
+  integrity sha512-QnWJoCQcJj+rnutULOihN9bixOtYWDdF5Rfz9fpHejL1BtNjdLW1om55XNVHGAHPqBxV4aeQQ6OirKnp9zKsug==
+
+solidity-comments-win32-ia32-msvc@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/solidity-comments-win32-ia32-msvc/-/solidity-comments-win32-ia32-msvc-0.0.2.tgz#5110e57d247d59131c82310ee1c88a8a9cfc7da5"
+  integrity sha512-vUg4nADtm/NcOtlIymG23NWJUSuMsvX15nU7ynhGBsdKtt8xhdP3C/zA6vjDk8Jg+FXGQL6IHVQ++g/7rSQi0w==
+
+solidity-comments-win32-x64-msvc@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/solidity-comments-win32-x64-msvc/-/solidity-comments-win32-x64-msvc-0.0.2.tgz#271ad8fbbaf17f6026362964ba3e1880e3dc3685"
+  integrity sha512-36j+KUF4V/y0t3qatHm/LF5sCUCBx2UndxE1kq5bOzh/s+nQgatuyB+Pd5BfuPQHdWu2KaExYe20FlAa6NL7+Q==
+
+solidity-comments@^0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/solidity-comments/-/solidity-comments-0.0.2.tgz#e1158d243ad55d5803882f2a67c0298466df573b"
+  integrity sha512-G+aK6qtyUfkn1guS8uzqUeua1dURwPlcOjoTYW/TwmXAcE7z/1+oGCfZUdMSe4ZMKklNbVZNiG5ibnF8gkkFfw==
+  optionalDependencies:
+    solidity-comments-darwin-arm64 "0.0.2"
+    solidity-comments-darwin-x64 "0.0.2"
+    solidity-comments-freebsd-x64 "0.0.2"
+    solidity-comments-linux-arm64-gnu "0.0.2"
+    solidity-comments-linux-arm64-musl "0.0.2"
+    solidity-comments-linux-x64-gnu "0.0.2"
+    solidity-comments-linux-x64-musl "0.0.2"
+    solidity-comments-win32-arm64-msvc "0.0.2"
+    solidity-comments-win32-ia32-msvc "0.0.2"
+    solidity-comments-win32-x64-msvc "0.0.2"
 
 solidity-coverage@^0.8.1:
   version "0.8.2"
