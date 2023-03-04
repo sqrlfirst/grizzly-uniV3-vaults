@@ -35,3 +35,5 @@ dist
 # VS Code
 .vscode
 
+#experiments
+_experiments
