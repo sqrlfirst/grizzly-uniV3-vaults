@@ -128,7 +128,7 @@ describe("ZapContract", () => {
         grizzlyVault = await ethers.getContractAt("GrizzlyVault", vaultAddress);
       });
       describe("Reverts ZapIn when not correctly done", () => {
-        it("Should revert ZapIn when vault and pool do not correspond", async () => {
+        it("Should revert ZapIn when vault and pool do not correspond", () => {
           const amount0Desired = ethers.utils.parseEther("1");
           const amount1Desired = ethers.utils.parseEther("0");
           const maxSwapSlippage = BigNumber.from(10); // 0.1%
@@ -142,6 +142,22 @@ describe("ZapContract", () => {
               maxSwapSlippage
             )
           ).to.be.revertedWith("wrong pool");
+        });
+
+        it("Should revert when slippage is too high", async () => {
+          const amount0Desired = ethers.utils.parseEther("1");
+          const amount1Desired = ethers.utils.parseEther("0");
+          const maxSwapSlippage = BigNumber.from(1000000); // 100%
+
+          await expect(
+            zapContract.zapIn(
+              uniswapPoolAddress,
+              vaultAddress,
+              amount0Desired,
+              amount1Desired,
+              maxSwapSlippage
+            )
+          ).to.be.revertedWith("max slippage too high");
         });
 
         it("Should revert ZapIn when token not approved", async () => {
