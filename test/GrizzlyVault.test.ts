@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import bn from "bignumber.js";
 import { BigNumber, BigNumberish } from "ethers";
-import { ethers, deployments, getNamedAccounts } from "hardhat";
+import { ethers, deployments } from "hardhat";
 import {
   IERC20,
   IUniswapV3Factory,
@@ -117,6 +117,75 @@ describe("Grizzly Vault Contracts", () => {
   });
 
   describe("Grizzly Vault Factory", () => {
+    describe("External view functions", () => {
+      it("Should get Token Name", async () => {
+        const tokenName = await grizzlyFactory.getTokenName(
+          token0.address,
+          token1.address
+        );
+        expect(tokenName).to.be.eq("Grizzly Uniswap TOKEN0/TOKEN1 LP");
+      });
+      it("Should get Grizzly vaults", async () => {
+        await grizzlyFactory
+          .connect(user)
+          .cloneGrizzlyVault(
+            token0.address,
+            token1.address,
+            3000,
+            0,
+            -887220,
+            887220,
+            manager.address
+          );
+
+        const vaults = await grizzlyFactory.getGrizzlyVaults();
+        expect(vaults.length).to.be.eq(1);
+        expect(vaults[0]).to.be.eq(grizzlyVault.address);
+      });
+      it("Should get vaults", async () => {
+        const tx = await grizzlyFactory
+          .connect(user)
+          .cloneGrizzlyVault(
+            token0.address,
+            token1.address,
+            3000,
+            0,
+            -887220,
+            887220,
+            manager.address
+          );
+
+        const receipt = await tx.wait();
+        const events = receipt.events?.filter((x) => {
+          return x.event == "VaultCreated";
+        });
+        if (!events) {
+          throw new Error("No events when vault created");
+        }
+        const newVaultAddress = events[0].args?.vault;
+
+        const vaults = await grizzlyFactory.getVaults(user.address);
+        expect(vaults.length).to.be.eq(1);
+        expect(vaults[0]).to.be.eq(newVaultAddress);
+      });
+      it("Should get number of vaults", async () => {
+        await grizzlyFactory
+          .connect(user)
+          .cloneGrizzlyVault(
+            token0.address,
+            token1.address,
+            3000,
+            0,
+            -887220,
+            887220,
+            manager.address
+          );
+
+        const nVaults = await grizzlyFactory.numVaults(user.address);
+        expect(nVaults).to.be.eq(1);
+      });
+    });
+
     describe("Clone Grizzly Vault", () => {
       describe("Reverts with wrong parameters", () => {
         it("Should revert when pool does not exist", () => {
@@ -166,16 +235,6 @@ describe("Grizzly Vault Contracts", () => {
             await grizzlyFactory.numVaults(deployerGrizzly.address)
           ).to.be.eq(BigNumber.from(2));
         });
-      });
-    });
-
-    describe("Token name", () => {
-      it("Should get correct name", async () => {
-        const tokenName = await grizzlyFactory.getTokenName(
-          token0.address,
-          token1.address
-        );
-        expect(tokenName).to.be.eq("Grizzly Uniswap TOKEN0/TOKEN1 LP");
       });
     });
 
@@ -666,3 +725,5 @@ describe("Grizzly Vault Contracts", () => {
     });
   });
 });
+
+//TODO: Mainnet test revert "tickSpacing mismatch"
