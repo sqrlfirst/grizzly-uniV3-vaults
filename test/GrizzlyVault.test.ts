@@ -768,7 +768,7 @@ describe("Grizzly Vault Contracts", () => {
         });
 
 
-      describe.skip("Burn", () => {
+      describe("Burn", () => {
         let mintAmount: BigNumber;
         let amount0: BigNumber;
         let amount1: BigNumber;
