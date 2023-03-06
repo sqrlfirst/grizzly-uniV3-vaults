@@ -188,8 +188,8 @@ describe("Grizzly Vault Contracts", () => {
 
     describe("Clone Grizzly Vault", () => {
       describe("Reverts with wrong parameters", () => {
-        it("Should revert when pool does not exist", () => {
-          expect(
+        it("Should revert when pool does not exist", async () => {
+          await expect(
             grizzlyFactory.cloneGrizzlyVault(
               token0.address,
               token1.address,
@@ -202,8 +202,8 @@ describe("Grizzly Vault Contracts", () => {
           ).to.be.revertedWith("uniV3Pool does not exist");
         });
 
-        it("Should revert when pool tickspace is not correct", () => {
-          expect(
+        it("Should revert when pool tickspace is not correct", async () => {
+          await expect(
             grizzlyFactory.cloneGrizzlyVault(
               token0.address,
               token1.address,
@@ -239,8 +239,8 @@ describe("Grizzly Vault Contracts", () => {
     });
 
     describe("Set implementation vault", () => {
-      it("Should revert with 0 address", () => {
-        expect(
+      it("Should revert with 0 address", async () => {
+        await expect(
           grizzlyFactory.setImplementationVault(ethers.constants.AddressZero)
         ).to.be.revertedWith("zeroAddress");
       });
@@ -400,7 +400,7 @@ describe("Grizzly Vault Contracts", () => {
           amount0Max = ethers.utils.parseEther("1");
           amount1Max = ethers.utils.parseEther("0");
 
-          expect(
+          await expect(
             grizzlyVault.getMintAmounts(amount0Max, amount1Max)
           ).to.be.revertedWith("mint 0");
 
@@ -408,7 +408,7 @@ describe("Grizzly Vault Contracts", () => {
           amount0Max = ethers.utils.parseEther("0");
           amount1Max = ethers.utils.parseEther("1");
 
-          expect(
+          await expect(
             grizzlyVault.getMintAmounts(amount0Max, amount1Max)
           ).to.be.revertedWith("mint 0");
 
@@ -416,7 +416,7 @@ describe("Grizzly Vault Contracts", () => {
           amount0Max = ethers.utils.parseEther("0");
           amount1Max = ethers.utils.parseEther("0");
 
-          expect(
+          await expect(
             grizzlyVault.getMintAmounts(amount0Max, amount1Max)
           ).to.be.revertedWith("mint 0");
         });
@@ -434,31 +434,6 @@ describe("Grizzly Vault Contracts", () => {
           // );
         });
 
-        it("Should correctly get the balances with charged pool", async () => {
-          // Deployer loads the pool with some tokens
-          const amount0MaxDep = ethers.utils.parseEther("100");
-          const amount1MaxDep = ethers.utils.parseEther("100");
-
-          const amountsDep = await grizzlyVault.getMintAmounts(
-            amount0MaxDep,
-            amount1MaxDep
-          );
-
-          token0.approve(grizzlyVault.address, amountsDep.amount0);
-          token1.approve(grizzlyVault.address, amountsDep.amount1);
-
-          grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
-
-          // We check the balances
-          const balances = await grizzlyVault.getUnderlyingBalances();
-
-          expect(balances.amount0Current).to.be.eq(
-            ethers.utils.parseEther("99.999999999999999998")
-          );
-          expect(balances.amount1Current).to.be.eq(
-            ethers.utils.parseEther("99.999999999999999998")
-          );
-        });
         it("Should correctly get the balances with charged pool", async () => {
           // Deployer loads the pool with some tokens
           const amount0MaxDep = ethers.utils.parseEther("100");
@@ -556,8 +531,8 @@ describe("Grizzly Vault Contracts", () => {
           grizzlyVault.connect(user).mint(mintAmount, user.address);
         });
 
-        it("Should revert if burn amount is 0", () => {
-          expect(
+        it("Should revert if burn amount is 0", async () => {
+          await expect(
             grizzlyVault.burn(
               BigNumber.from(0),
               defaultMaxSlippage,
@@ -567,9 +542,9 @@ describe("Grizzly Vault Contracts", () => {
           ).to.be.revertedWith("burn 0");
         });
 
-        it("Should revert if user does not have enough LP tokens", () => {
+        it("Should revert if user does not have enough LP tokens", async () => {
           const burnAmount = mintAmount.add(1);
-          expect(
+          await expect(
             grizzlyVault
               .connect(user)
               .burn(burnAmount, defaultMaxSlippage, 0, user.address)
@@ -684,14 +659,14 @@ describe("Grizzly Vault Contracts", () => {
     });
     describe("External manager functions", () => {
       describe("Executive rebalance", () => {
-        it("Should revert if not manager", () => {
+        it("Should revert if not manager", async () => {
           // run executiverebalance on vault as deployer
-          expect(
+          await expect(
             grizzlyVault.executiveRebalance(-887220, 887220, 3000)
           ).to.be.revertedWith("Ownable: caller is not the manager");
 
           // run executiverebalance on vault as deployer
-          expect(
+          await expect(
             grizzlyVault.connect(user).executiveRebalance(-887220, 887220, 3000)
           ).to.be.revertedWith("Ownable: caller is not the manager");
         });
@@ -699,25 +674,27 @@ describe("Grizzly Vault Contracts", () => {
     });
     describe("External authorized functions", () => {
       describe("Rebalance", () => {
-        it("Should revert if not authorized", () => {
+        it("Should revert if not authorized", async () => {
           // run rebalance as deployer
-          expect(grizzlyVault.rebalance()).to.be.revertedWith("not authorized");
-
-          // run rebalance as user
-          expect(grizzlyVault.connect(user).rebalance()).to.be.revertedWith(
+          await expect(grizzlyVault.rebalance()).to.be.revertedWith(
             "not authorized"
           );
+
+          // run rebalance as user
+          await expect(
+            grizzlyVault.connect(user).rebalance()
+          ).to.be.revertedWith("not authorized");
         });
       });
       describe("Withdraw manager balance", () => {
-        it("Should revert if not authorized", () => {
+        it("Should revert if not authorized", async () => {
           // run as deployer
-          expect(
+          await expect(
             grizzlyVault.connect(user).withdrawManagerBalance()
           ).to.be.revertedWith("not authorized");
 
           // run as user
-          expect(
+          await expect(
             grizzlyVault.connect(user).withdrawManagerBalance()
           ).to.be.revertedWith("not authorized");
         });
