@@ -22,7 +22,7 @@ contract GrizzlyVaultFactory is IGrizzlyVaultFactory, Ownable {
 
 	mapping(address => EnumerableSet.AddressSet) internal _vaults;
 
-	event VaultCreated(address indexed uniPool, address indexed manager, address indexed pool);
+	event VaultCreated(address indexed uniPool, address indexed manager, address indexed vault);
 	event ImplementationVaultChanged(address newImplementation, address origImplementation);
 
 	constructor(address _implementation, address _grizzlyDeployer) {
