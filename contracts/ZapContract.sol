@@ -135,7 +135,7 @@ contract ZapContract is IUniswapV3SwapCallback, Ownable {
 		);
 
 		vars.balance0Zap = vars.token0.balanceOf(address(this));
-		vars.balance1Zap = vars.token0.balanceOf(address(this));
+		vars.balance1Zap = vars.token1.balanceOf(address(this));
 
 		// Swap Dust Back
 		if (vars.balance0Zap > 0 && amount0Desired == 0) {
