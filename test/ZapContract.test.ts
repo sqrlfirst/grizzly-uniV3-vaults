@@ -80,8 +80,8 @@ describe("ZapContract", () => {
 
   describe("ZapIn with mock tokens", () => {
     beforeEach(async () => {
-      token0 = await ethers.getContract("Token0", deployerGrizzly);
-      token1 = await ethers.getContract("Token1", deployerGrizzly);
+      token0 = await ethers.getContract("TokenA", deployerGrizzly);
+      token1 = await ethers.getContract("TokenB", deployerGrizzly);
 
       // We charge user account with some tokens
       token0.transfer(user.address, ethers.utils.parseEther("10"));

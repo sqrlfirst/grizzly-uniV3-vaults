@@ -13,26 +13,26 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
 
-  await deploy("Token0", {
+  await deploy("TokenA", {
     contract: "MockERC20",
     from: deployer,
     proxy: {
       execute: {
         methodName: "initialize",
-        args: ["Token 0", "TOKEN0"],
+        args: ["Token A", "TOKENA"],
       },
     },
     log: true,
     autoMine: true,
   });
 
-  await deploy("Token1", {
+  await deploy("TokenB", {
     contract: "MockERC20",
     from: deployer,
     proxy: {
       execute: {
         methodName: "initialize",
-        args: ["Token 1", "TOKEN1"],
+        args: ["Token B", "TOKENB"],
       },
     },
     log: true,
