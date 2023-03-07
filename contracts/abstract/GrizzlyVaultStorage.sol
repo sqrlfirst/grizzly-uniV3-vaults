@@ -65,8 +65,8 @@ abstract contract GrizzlyVaultStorage is
 	/// @param _name Name of Grizzly vault token
 	/// @param _symbol Symbol of Grizzly vault token
 	/// @param _pool Address of Uniswap V3 pool
+	/// Note that the 3 above params are NOT UPDATABLE AFTER INITIALIZATION
 	/// @param _managerFee Proportion of fees earned that go to manager treasury
-	/// Note that the 4 above params are NOT UPDATABLE AFTER INITIALIZATION
 	/// @param _lowerTick Initial lowerTick (only changeable with executiveRebalance)
 	/// @param _lowerTick Initial upperTick (only changeable with executiveRebalance)
 	/// @param _manager_ Address of manager (ownership can be transferred)
@@ -81,7 +81,7 @@ abstract contract GrizzlyVaultStorage is
 	) external override initializer {
 		require(_managerFee <= basisOne, "fee too high");
 
-		_validateTickSpacing(_pool, _lowerTick, _upperTick);
+		require(_validateTickSpacing(_pool, _lowerTick, _upperTick), "tickSpacing mismatch");
 
 		// These variables are immutable after initialization
 		pool = IUniswapV3Pool(_pool);
