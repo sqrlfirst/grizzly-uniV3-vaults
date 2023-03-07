@@ -79,7 +79,7 @@ abstract contract GrizzlyVaultStorage is
 		int24 _upperTick,
 		address _manager_
 	) external override initializer {
-		require(_managerFee <= 1000000, "bps");
+		require(_managerFee <= basisOne, "fee too high");
 
 		_validateTickSpacing(_pool, _lowerTick, _upperTick);
 
@@ -115,7 +115,7 @@ abstract contract GrizzlyVaultStorage is
 		uint32 newOracleSlippageInterval,
 		address newTreasury
 	) external onlyManager {
-		require(newOracleSlippage <= 1000000, "bps");
+		require(newOracleSlippage <= basisOne, "slippage too high");
 
 		if (newOracleSlippage != 0) oracleSlippage = newOracleSlippage;
 		if (newOracleSlippageInterval != 0) oracleSlippageInterval = newOracleSlippageInterval;
@@ -126,8 +126,8 @@ abstract contract GrizzlyVaultStorage is
 
 	/// @notice setManagerFee sets a managerFee, only manager can call
 	/// @param _managerFee Proportion of fees earned that are credited to manager in Basis Points
-	function setManagerFee(uint16 _managerFee) external onlyManager {
-		require(_managerFee > 0 && _managerFee <= 1000000, "bps");
+	function setManagerFee(uint24 _managerFee) external onlyManager {
+		require(_managerFee > 0 && _managerFee <= basisOne, "fee too high");
 		emit SetManagerFee(_managerFee);
 		managerFee = _managerFee;
 	}
