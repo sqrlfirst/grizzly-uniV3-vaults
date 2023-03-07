@@ -793,10 +793,10 @@ describe("Grizzly Vault Contracts", () => {
           ).to.be.revertedWith("liquidity must increase");
         });
         it("Should let bot and manager to rebalance", async () => {
-          // We first make the evm go some second forward
+          // We first make the evm go some seconds forward
           await helpers.time.increase(300);
 
-          // We make some swaps too generate fees
+          // We make some swaps to generate fees
           await swapTest.washTrade(
             uniswapPool.address,
             ethers.utils.parseEther("0.5"),
@@ -848,6 +848,35 @@ describe("Grizzly Vault Contracts", () => {
         });
       });
       describe("Withdraw manager balance", () => {
+        beforeEach(async () => {
+          // Deployer loads the pool with some tokens
+          const amount0MaxDep = ethers.utils.parseEther("100");
+          const amount1MaxDep = ethers.utils.parseEther("100");
+
+          const amountsDep = await grizzlyVault.getMintAmounts(
+            amount0MaxDep,
+            amount1MaxDep
+          );
+
+          token0.approve(grizzlyVault.address, amountsDep.amount0);
+          token1.approve(grizzlyVault.address, amountsDep.amount1);
+
+          grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
+
+          // We give bot manager authorization
+          await grizzlyVault.connect(manager).setKeeperAddress(bot.address);
+
+          // We first make the evm go some seconds forward
+          await helpers.time.increase(300);
+
+          // We make some swaps too generate fees
+          await swapTest.washTrade(
+            uniswapPool.address,
+            ethers.utils.parseEther("0.5"),
+            100,
+            2
+          );
+        });
         it("Should revert if not authorized", async () => {
           // run as deployer
           await expect(
@@ -858,6 +887,108 @@ describe("Grizzly Vault Contracts", () => {
           await expect(
             grizzlyVault.connect(user).withdrawManagerBalance()
           ).to.be.revertedWith("not authorized");
+        });
+
+        it("Should get 0 manager fees with 0 parameter", async () => {
+          // We rebalance to apply fees
+          await grizzlyVault.connect(manager).rebalance();
+
+          // We check manager balances before
+          const balance0Before = await token0.balanceOf(manager.address);
+          const balance1Before = await token1.balanceOf(manager.address);
+
+          // Manager withdraws fees to default address = manager
+          await grizzlyVault.connect(manager).withdrawManagerBalance();
+
+          // We compare them afterwards
+          const balance0After = await token0.balanceOf(manager.address);
+          const balance1After = await token1.balanceOf(manager.address);
+
+          expect(balance0After).to.be.eq(balance0Before);
+          expect(balance1After).to.be.eq(balance1Before);
+        });
+
+        it("Should get 0 manager fees with no burns or rebalances", async () => {
+          // Increase manager fee to 50%
+          await grizzlyVault.connect(manager).setManagerFee(500000);
+
+          // We check manager balances before
+          const balance0Before = await token0.balanceOf(manager.address);
+          const balance1Before = await token1.balanceOf(manager.address);
+
+          // Manager withdraws fees to default address = manager
+          await grizzlyVault.connect(manager).withdrawManagerBalance();
+
+          // We compare them afterwards
+          const balance0After = await token0.balanceOf(manager.address);
+          const balance1After = await token1.balanceOf(manager.address);
+
+          expect(balance0After).to.be.eq(balance0Before);
+          expect(balance1After).to.be.eq(balance1Before);
+        });
+
+        it("Should get some manager fees after burn", async () => {
+          // Increase manager fee to 50%
+          await grizzlyVault.connect(manager).setManagerFee(500000);
+
+          // We burn some liquidity to apply fees to
+          const balanceLP = await grizzlyVault.balanceOf(
+            deployerGrizzly.address
+          );
+          await grizzlyVault.approve(grizzlyVault.address, balanceLP);
+          await grizzlyVault.burn(balanceLP, 50000, 1, deployerGrizzly.address);
+
+          // We check manager balances before
+          const balance0Before = await token0.balanceOf(manager.address);
+          const balance1Before = await token1.balanceOf(manager.address);
+
+          // Manager withdraws fees to default address = manager
+          await grizzlyVault.connect(manager).withdrawManagerBalance();
+
+          // We compare them afterwards
+          const balance0After = await token0.balanceOf(manager.address);
+          const balance1After = await token1.balanceOf(manager.address);
+
+          expect(balance0After).to.be.gt(balance0Before);
+          expect(balance1After).to.be.gt(balance1Before);
+        });
+
+        it("Should get some manager fees after rebalance", async () => {
+          // Increase manager fee to 50%
+          await grizzlyVault.connect(manager).setManagerFee(500000);
+
+          // We rebalance to apply fees
+          await grizzlyVault.connect(manager).rebalance();
+
+          // We check manager balances before
+          const balance0Before = await token0.balanceOf(manager.address);
+          const balance1Before = await token1.balanceOf(manager.address);
+
+          // Manager withdraws fees to default address = manager
+          await grizzlyVault.connect(manager).withdrawManagerBalance();
+
+          // We compare them afterwards
+          const balance0After = await token0.balanceOf(manager.address);
+          const balance1After = await token1.balanceOf(manager.address);
+
+          expect(balance0After).to.be.gt(balance0Before);
+          expect(balance1After).to.be.gt(balance1Before);
+
+          // We repeat the operation with a bot
+          await swapTest.washTrade(
+            uniswapPool.address,
+            ethers.utils.parseEther("0.5"),
+            100,
+            2
+          );
+          await grizzlyVault.connect(manager).rebalance();
+          await grizzlyVault.connect(bot).withdrawManagerBalance();
+
+          const balance0AfterAfter = await token0.balanceOf(manager.address);
+          const balance1AfterAfter = await token1.balanceOf(manager.address);
+
+          expect(balance0AfterAfter).to.be.gt(balance0After);
+          expect(balance1AfterAfter).to.be.gt(balance1After);
         });
       });
     });
