@@ -25,7 +25,7 @@ contract SwapTest is IUniswapV3SwapCallback {
 		uint256 ratio
 	) external {
 		for (uint256 i = 0; i < numTrades; i++) {
-			bool zeroForOne = i % ratio > 0;
+			bool zeroForOne = ratio == 0 ? true : i % ratio > 0;
 			(uint160 sqrtRatio, , , , , , ) = IUniswapV3Pool(pool).slot0();
 			IUniswapV3Pool(pool).swap(
 				address(msg.sender),

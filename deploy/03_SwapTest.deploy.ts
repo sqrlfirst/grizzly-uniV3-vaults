@@ -32,6 +32,6 @@ func.skip = async (hre: HardhatRuntimeEnvironment) => {
   return shouldSkip ? true : false;
 };
 
-func.tags = ["SwapTest"];
+func.tags = ["SwapTest", "local"];
 
 export default func;
