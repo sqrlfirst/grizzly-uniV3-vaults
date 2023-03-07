@@ -8,9 +8,10 @@ import {
   IUniswapV3Pool,
   GrizzlyVault,
   GrizzlyVaultFactory,
+  SwapTest,
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-//import * as helpers from "@nomicfoundation/hardhat-network-helpers";
+import * as helpers from "@nomicfoundation/hardhat-network-helpers";
 
 bn.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
 
@@ -39,9 +40,11 @@ describe("Grizzly Vault Contracts", () => {
   let grizzlyCoreVault: GrizzlyVault;
   let grizzlyVault: GrizzlyVault;
   let grizzlyFactory: GrizzlyVaultFactory;
+  let swapTest: SwapTest;
 
   let uniswapPoolAddress: string;
   let vaultAddress: string;
+  let tokenName: string;
 
   let deployerGrizzly: SignerWithAddress;
   let manager: SignerWithAddress;
@@ -50,6 +53,9 @@ describe("Grizzly Vault Contracts", () => {
 
   before(async () => {
     [deployerGrizzly, manager, user, bot] = await ethers.getSigners();
+
+    await deployments.fixture(["local"]);
+    swapTest = await ethers.getContract("SwapTest", deployerGrizzly);
   });
 
   beforeEach(async () => {
@@ -70,18 +76,31 @@ describe("Grizzly Vault Contracts", () => {
       deployerGrizzly
     );
 
-    token0 = await ethers.getContract("Token0", deployerGrizzly);
-    token1 = await ethers.getContract("Token1", deployerGrizzly);
+    token0 = await ethers.getContract("TokenA", deployerGrizzly);
+    token1 = await ethers.getContract("TokenB", deployerGrizzly);
 
     // We charge user account with some tokens
     token0.transfer(user.address, ethers.utils.parseEther("100"));
     token1.transfer(user.address, ethers.utils.parseEther("100"));
+
+    // We increase allowance of swapTest
+    await token0.approve(
+      swapTest.address,
+      ethers.utils.parseEther("10000000000000")
+    );
+    await token1.approve(
+      swapTest.address,
+      ethers.utils.parseEther("10000000000000")
+    );
 
     // Sort token0 & token1 so it follows the same order as Uniswap & the GrizzlyVaultFactory
     if (BigNumber.from(token0.address).gt(BigNumber.from(token1.address))) {
       const tmp = token0;
       token0 = token1;
       token1 = tmp;
+      tokenName = "TOKENB/TOKENA";
+    } else {
+      tokenName = "TOKENA/TOKENB";
     }
 
     // We create a UniswapV3 pool with the mock tokens
@@ -119,11 +138,11 @@ describe("Grizzly Vault Contracts", () => {
   describe("Grizzly Vault Factory", () => {
     describe("External view functions", () => {
       it("Should get Token Name", async () => {
-        const tokenName = await grizzlyFactory.getTokenName(
+        const lpTokenName = await grizzlyFactory.getTokenName(
           token0.address,
           token1.address
         );
-        expect(tokenName).to.be.eq("Grizzly Uniswap TOKEN0/TOKEN1 LP");
+        expect(lpTokenName).to.be.eq(`Grizzly Uniswap ${tokenName} LP`);
       });
       it("Should get Grizzly vaults", async () => {
         await grizzlyFactory
@@ -427,11 +446,6 @@ describe("Grizzly Vault Contracts", () => {
 
           expect(balances.amount0Current).to.be.eq(BigNumber.from(0));
           expect(balances.amount1Current).to.be.eq(BigNumber.from(0));
-          // console.log(
-          //   "BALANCES ",
-          //   ethers.utils.formatEther(balances.amount0Current),
-          //   ethers.utils.formatEther(balances.amount1Current)
-          // );
         });
 
         it("Should correctly get the balances with charged pool", async () => {
@@ -461,7 +475,6 @@ describe("Grizzly Vault Contracts", () => {
         });
 
         it("Should correctly get the balances after some swaps", async () => {
-          // TODO (use SwapTest.sol ?)
           // Deployer loads the pool with some tokens
           const amount0MaxDep = ethers.utils.parseEther("100");
           const amount1MaxDep = ethers.utils.parseEther("100");
@@ -476,19 +489,87 @@ describe("Grizzly Vault Contracts", () => {
 
           grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
 
+          // We generate some symmetric swaps
+          await swapTest.washTrade(
+            uniswapPool.address,
+            ethers.utils.parseEther("0.5"),
+            100,
+            2
+          );
+
           // We check the balances
           const balances = await grizzlyVault.getUnderlyingBalances();
 
-          expect(balances.amount0Current).to.be.eq(
-            ethers.utils.parseEther("99.999999999999999998")
+          expect(balances.amount0Current).to.be.gt(
+            ethers.utils.parseEther("100")
           );
-          expect(balances.amount1Current).to.be.eq(
-            ethers.utils.parseEther("99.999999999999999998")
+          expect(balances.amount1Current).to.be.gt(
+            ethers.utils.parseEther("100")
           );
         });
       });
-      describe("Get underlying balances at price", () => {});
-      describe("Estimate Fees", () => {});
+      describe("Get underlying balances at price", () => {
+        //TODO: Not sure what this function will be used for
+      });
+      describe("Estimate Fees", () => {
+        beforeEach(async () => {
+          // Deployer loads the pool with some tokens
+          const amount0MaxDep = ethers.utils.parseEther("100");
+          const amount1MaxDep = ethers.utils.parseEther("100");
+
+          const amountsDep = await grizzlyVault.getMintAmounts(
+            amount0MaxDep,
+            amount1MaxDep
+          );
+
+          token0.approve(grizzlyVault.address, amountsDep.amount0);
+          token1.approve(grizzlyVault.address, amountsDep.amount1);
+
+          grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
+        });
+        it("Should provide 0 fees without swaps", async () => {
+          const fees = await grizzlyVault.estimateFees();
+
+          expect(fees.token0Fee).to.be.eq(0);
+          expect(fees.token1Fee).to.be.eq(0);
+        });
+
+        it("Should gather token0 fees after 0 to 1 swaps", async () => {
+          // We generate some swaps
+          await swapTest.washTrade(uniswapPool.address, 50000, 100, 0);
+
+          const fees = await grizzlyVault.estimateFees();
+          console.log(fees.token0Fee.toString());
+          console.log(fees.token1Fee.toString());
+
+          expect(fees.token0Fee).to.be.gt(0);
+          expect(fees.token1Fee).to.be.eq(0);
+        });
+
+        it("Should gather token1 fees after 1 to 0 swaps", async () => {
+          // We generate some swaps
+          await swapTest.washTrade(uniswapPool.address, 50000, 100, 1);
+
+          const fees = await grizzlyVault.estimateFees();
+          console.log(fees.token0Fee.toString());
+          console.log(fees.token1Fee.toString());
+
+          expect(fees.token0Fee).to.be.eq(0);
+          expect(fees.token1Fee).to.be.gt(0);
+        });
+
+        it("Should gather both token fees after some swaps", async () => {
+          // We generate some swaps
+          await swapTest.washTrade(uniswapPool.address, 50000, 100, 2);
+
+          const fees = await grizzlyVault.estimateFees();
+          console.log(fees.token0Fee.toString());
+          console.log(fees.token1Fee.toString());
+
+          expect(fees.token0Fee).to.be.gt(0);
+          expect(fees.token1Fee).to.be.gt(0);
+        });
+      });
     });
     describe("User Functions", () => {
       describe("Mint", () => {});
@@ -499,7 +580,6 @@ describe("Grizzly Vault Contracts", () => {
         let defaultMaxSlippage = BigNumber.from("5000");
 
         beforeEach(async () => {
-          // We load the pool before being able to swap
           // Deployer loads the pool with some tokens
           const amount0MaxDep = ethers.utils.parseEther("100");
           const amount1MaxDep = ethers.utils.parseEther("100");
@@ -660,20 +740,39 @@ describe("Grizzly Vault Contracts", () => {
     describe("External manager functions", () => {
       describe("Executive rebalance", () => {
         it("Should revert if not manager", async () => {
-          // run executiverebalance on vault as deployer
+          // run as deployer
           await expect(
             grizzlyVault.executiveRebalance(-887220, 887220, 3000)
           ).to.be.revertedWith("Ownable: caller is not the manager");
 
-          // run executiverebalance on vault as deployer
+          // run as user
           await expect(
             grizzlyVault.connect(user).executiveRebalance(-887220, 887220, 3000)
           ).to.be.revertedWith("Ownable: caller is not the manager");
         });
       });
     });
+
     describe("External authorized functions", () => {
       describe("Rebalance", () => {
+        beforeEach(async () => {
+          // Deployer loads the pool with some tokens
+          const amount0MaxDep = ethers.utils.parseEther("100");
+          const amount1MaxDep = ethers.utils.parseEther("100");
+
+          const amountsDep = await grizzlyVault.getMintAmounts(
+            amount0MaxDep,
+            amount1MaxDep
+          );
+
+          token0.approve(grizzlyVault.address, amountsDep.amount0);
+          token1.approve(grizzlyVault.address, amountsDep.amount1);
+
+          grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
+
+          // We give bot manager authorization
+          await grizzlyVault.connect(manager).setKeeperAddress(bot.address);
+        });
         it("Should revert if not authorized", async () => {
           // run rebalance as deployer
           await expect(grizzlyVault.rebalance()).to.be.revertedWith(
@@ -684,6 +783,68 @@ describe("Grizzly Vault Contracts", () => {
           await expect(
             grizzlyVault.connect(user).rebalance()
           ).to.be.revertedWith("not authorized");
+        });
+        it("Should revert if liquidity did not increase", async () => {
+          // We first make the evm go some second forward
+          await helpers.time.increase(300);
+
+          await expect(
+            grizzlyVault.connect(manager).rebalance()
+          ).to.be.revertedWith("liquidity must increase");
+        });
+        it("Should let bot and manager to rebalance", async () => {
+          // We first make the evm go some second forward
+          await helpers.time.increase(300);
+
+          // We make some swaps too generate fees
+          await swapTest.washTrade(
+            uniswapPool.address,
+            ethers.utils.parseEther("0.5"),
+            100,
+            2
+          );
+
+          // We read some values from the vault
+          const ticks = await grizzlyVault.baseTicks();
+          const id = await grizzlyVault.getPositionID();
+          const liquidity = (await uniswapPool.positions(id))._liquidity;
+
+          const tx = await grizzlyVault.connect(manager).rebalance();
+
+          // Check event emission
+          const receipt = await tx.wait();
+          const events = receipt.events?.filter((x) => {
+            return x.event == "Rebalance";
+          });
+          if (!events) {
+            throw new Error("No events when rebalance");
+          }
+
+          // Read new values
+          const newLiquidity = (await uniswapPool.positions(id))._liquidity;
+
+          // Check event parameters
+          const args = events[0].args;
+          if (!args) {
+            throw new Error("Event has no args");
+          }
+          expect(ticks.lowerTick).to.be.eq(args[0]);
+          expect(ticks.upperTick).to.be.eq(args[1]);
+          expect(liquidity).to.be.eq(args[2]);
+          expect(newLiquidity).to.be.eq(args[3]);
+
+          //Check change in liquidity
+          expect(newLiquidity).to.be.gt(liquidity);
+
+          // Bot can perform the same operation without reverting
+          await swapTest.washTrade(
+            uniswapPool.address,
+            ethers.utils.parseEther("0.5"),
+            100,
+            2
+          );
+
+          await grizzlyVault.connect(bot).rebalance();
         });
       });
       describe("Withdraw manager balance", () => {
