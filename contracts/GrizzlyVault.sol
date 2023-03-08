@@ -212,6 +212,12 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		int24 newUpperTick,
 		uint128 minLiquidity
 	) external onlyManager {
+		//validate new ticks
+		require(
+			_validateTickSpacing(address(pool), newLowerTick, newUpperTick),
+			"tickSpacing mismatch"
+		);
+
 		// First check pool health
 		_checkPriceSlippage();
 
@@ -244,6 +250,7 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 			_addLiquidity(newTicks, finalAmount0, finalAmount1);
 
 			(newLiquidity, , , , ) = pool.positions(_getPositionID(newTicks));
+
 			require(newLiquidity > minLiquidity, "min liquidity");
 		} else {
 			// Update storage ticks
@@ -465,6 +472,7 @@ contract GrizzlyVault is IUniswapV3MintCallback, IUniswapV3SwapCallback, Grizzly
 		uint256 _slippageSqrt = zeroForOne
 			? prbSqrt(basisOne - _slippageMax)
 			: prbSqrt(basisOne + _slippageMax);
+
 		return
 			pool.swap(
 				address(this),
