@@ -602,171 +602,169 @@ describe("Grizzly Vault Contracts", () => {
           const amount0MaxDep = ethers.utils.parseEther("100");
           const amount1MaxDep = ethers.utils.parseEther("100");
 
-          // Get Mint amounts
-          const amountsDep = await grizzlyVault.getMintAmounts(
-            amount0MaxDep,
-            amount1MaxDep
-          );
-          
-          token0.approve(grizzlyVault.address, amountsDep.amount0);
-          token1.approve(grizzlyVault.address, amountsDep.amount1);
+        // Get Mint amounts
+        const amountsDep = await grizzlyVault.getMintAmounts(
+          amount0MaxDep,
+          amount1MaxDep
+        );
 
-          grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
+        token0.approve(grizzlyVault.address, amountsDep.amount0);
+        token1.approve(grizzlyVault.address, amountsDep.amount1);
 
+        grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
+      });
+
+      it("should mint correctly", async () => {
+        // Check user balances before mint
+        const token0BalanceBefore = await token0.balanceOf(user.address);
+        const token1BalanceBefore = await token1.balanceOf(user.address);
+        const lpBalanceBefore = await grizzlyVault.balanceOf(user.address);
+
+        console.log("token0BalanceBefore", token0BalanceBefore.toString());
+        console.log("token1BalanceBefore", token1BalanceBefore.toString());
+
+        // We mint some tokens to be burned after
+        const amount0Max = ethers.utils.parseEther("1.0");
+        const amount1Max = ethers.utils.parseEther("1.0");
+        const amounts = await grizzlyVault.getMintAmounts(
+          amount0Max,
+          amount1Max
+        );
+        mintAmount = amounts.mintAmount;
+        amount0 = amounts.amount0;
+        amount1 = amounts.amount1;
+
+        token0.connect(user).approve(grizzlyVault.address, amount0);
+        token1.connect(user).approve(grizzlyVault.address, amount1);
+
+        grizzlyVault.connect(user).mint(mintAmount, user.address);
+
+        // Check user balances after mint
+        const token0BalanceAfter = await token0.balanceOf(user.address);
+        const token1BalanceAfter = await token1.balanceOf(user.address);
+        const lpBalanceAfter = await grizzlyVault.balanceOf(user.address);
+
+        expect(lpBalanceAfter).to.be.gt(lpBalanceBefore);
+        expect(token0BalanceAfter).to.be.lt(token0BalanceBefore);
+        expect(token1BalanceAfter).to.be.lt(token1BalanceBefore);
+      });
+
+      it("shold emit mint event", async () => {
+        const amount0Max = ethers.utils.parseEther("1.0");
+        const amount1Max = ethers.utils.parseEther("1.0");
+        const amounts = await grizzlyVault.getMintAmounts(
+          amount0Max,
+          amount1Max
+        );
+        mintAmount = amounts.mintAmount;
+        amount0 = amounts.amount0;
+        amount1 = amounts.amount1;
+
+        token0.connect(user).approve(grizzlyVault.address, amount0);
+        token1.connect(user).approve(grizzlyVault.address, amount1);
+
+        const tx = await grizzlyVault
+          .connect(user)
+          .mint(mintAmount, user.address);
+
+        const receipt = await tx.wait();
+        const events = receipt.events?.filter((e) => {
+          return e.event === "Minted";
         });
+        // console.log(events)
+        if (!events) {
+          throw new Error("No events emitted on mint");
+        }
+      });
+      it("should revert when mintAmount is 0", async () => {
+        const amount0Max = ethers.utils.parseEther("0");
+        const amount1Max = ethers.utils.parseEther("0");
+        const amounts = await grizzlyVault.getMintAmounts(
+          amount0Max,
+          amount1Max
+        );
+        mintAmount = amounts.mintAmount;
+        amount0 = amounts.amount0;
+        amount1 = amounts.amount1;
 
-        it("should mint correctly", async () => {
-          // Check user balances before mint
-          const token0BalanceBefore = await token0.balanceOf(user.address);
-          const token1BalanceBefore = await token1.balanceOf(user.address);
-          const lpBalanceBefore = await grizzlyVault.balanceOf(user.address);
-          
+        token0.connect(user).approve(grizzlyVault.address, amount0);
+        token1.connect(user).approve(grizzlyVault.address, amount1);
 
-          console.log("token0BalanceBefore", token0BalanceBefore.toString());
-          console.log("token1BalanceBefore", token1BalanceBefore.toString());
+        await expect(
+          grizzlyVault.connect(user).mint(mintAmount, user.address)
+        ).to.be.revertedWith("mint 0");
+      });
 
-          // We mint some tokens to be burned after
-          const amount0Max = ethers.utils.parseEther("1.0");
-          const amount1Max = ethers.utils.parseEther("1.0");
-          const amounts = await grizzlyVault.getMintAmounts(
-            amount0Max,
-            amount1Max
-          );
-          mintAmount = amounts.mintAmount;
-          amount0 = amounts.amount0;
-          amount1 = amounts.amount1;
-          
-          token0.connect(user).approve(grizzlyVault.address, amount0);
-          token1.connect(user).approve(grizzlyVault.address, amount1);
+      it("should revert if user does not have enough Tokens to supply", async () => {
+        const amount0Max = ethers.utils.parseEther("1000.0");
+        const amount1Max = ethers.utils.parseEther("1000.0");
+        const amounts = await grizzlyVault.getMintAmounts(
+          amount0Max,
+          amount1Max
+        );
+        mintAmount = amounts.mintAmount;
+        amount0 = amounts.amount0;
+        amount1 = amounts.amount1;
 
-          grizzlyVault.connect(user).mint(mintAmount, user.address);
+        token0.connect(user).approve(grizzlyVault.address, amount0);
+        token1.connect(user).approve(grizzlyVault.address, amount1);
 
+        await expect(
+          grizzlyVault.connect(user).mint(mintAmount, user.address)
+        ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+      });
 
-          // Check user balances after mint
-          const token0BalanceAfter = await token0.balanceOf(user.address);
-          const token1BalanceAfter = await token1.balanceOf(user.address);
-          const lpBalanceAfter = await grizzlyVault.balanceOf(user.address);
+      it("should revert when missing approval", async () => {
+        const amount0MaxDep = ethers.utils.parseEther("100");
+        const amount1MaxDep = ethers.utils.parseEther("100");
 
-          expect(lpBalanceAfter).to.be.gt(lpBalanceBefore);
-          expect(token0BalanceAfter).to.be.lt(token0BalanceBefore);
-          expect(token1BalanceAfter).to.be.lt(token1BalanceBefore);
-          
-        });
+        // Get Mint amounts
+        const amountsDep = await grizzlyVault.getMintAmounts(
+          amount0MaxDep,
+          amount1MaxDep
+        );
 
-        it("shold emit mint event", async () => {
-          const amount0Max = ethers.utils.parseEther("1.0");
-          const amount1Max = ethers.utils.parseEther("1.0");
-          const amounts = await grizzlyVault.getMintAmounts(
-            amount0Max,
-            amount1Max
-          );
-          mintAmount = amounts.mintAmount;
-          amount0 = amounts.amount0;
-          amount1 = amounts.amount1;
-          
-          token0.connect(user).approve(grizzlyVault.address, amount0);
-          token1.connect(user).approve(grizzlyVault.address, amount1);
+        token0.approve(grizzlyVault.address, amountsDep.amount0);
+        token1.approve(grizzlyVault.address, amountsDep.amount1);
 
-          const tx = await grizzlyVault.connect(user).mint(mintAmount, user.address);
+        grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
 
-          const receipt = await tx.wait();
-          const events = receipt.events?.filter((e) => {return e.event === "Minted"});
-          // console.log(events)
-          if (!events) {
-            throw new Error("No events emitted on mint");
-          }
-        });
-        it("should revert when mintAmount is 0", async () => {
-          const amount0Max = ethers.utils.parseEther("0");
-          const amount1Max = ethers.utils.parseEther("0");
-          const amounts = await grizzlyVault.getMintAmounts(
-            amount0Max,
-            amount1Max
-          );
-          mintAmount = amounts.mintAmount;
-          amount0 = amounts.amount0;
-          amount1 = amounts.amount1;
-          
-          token0.connect(user).approve(grizzlyVault.address, amount0);
-          token1.connect(user).approve(grizzlyVault.address, amount1);
+        const amount0Max = ethers.utils.parseEther("10.0");
+        const amount1Max = ethers.utils.parseEther("10.0");
+        const amounts = await grizzlyVault.getMintAmounts(
+          amount0Max,
+          amount1Max
+        );
+        mintAmount = amounts.mintAmount;
+        amount0 = amounts.amount0;
+        amount1 = amounts.amount1;
 
-          await expect(
-            grizzlyVault.connect(user).mint(mintAmount, user.address)
-          ).to.be.revertedWith("mint 0");
-        });
+        token0.connect(user).approve(grizzlyVault.address, amount0);
+        // token1.connect(user).approve(grizzlyVault.address, amount1);
 
-        it("should revert if user does not have enough Tokens to supply", async () => {
-          const amount0Max = ethers.utils.parseEther("1000.0");
-          const amount1Max = ethers.utils.parseEther("1000.0");
-          const amounts = await grizzlyVault.getMintAmounts(
-            amount0Max,
-            amount1Max
-          );
-          mintAmount = amounts.mintAmount;
-          amount0 = amounts.amount0;
-          amount1 = amounts.amount1;
-          
-          token0.connect(user).approve(grizzlyVault.address, amount0);
-          token1.connect(user).approve(grizzlyVault.address, amount1);
+        const totalSupplyVault = await grizzlyVault.totalSupply();
+        expect(
+          grizzlyVault.connect(user).mint(mintAmount, user.address)
+        ).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+      });
+      it("should revert when mint amount < MIN_INITIAL_SHARES", async () => {
+        const amount0Max = ethers.utils.parseUnits("12.0", 6);
+        const amount1Max = ethers.utils.parseUnits("12.0", 6);
+        const amounts = await grizzlyVault.getMintAmounts(
+          amount0Max,
+          amount1Max
+        );
+        mintAmount = amounts.mintAmount;
+        amount0 = amounts.amount0;
+        amount1 = amounts.amount1;
 
-          await expect(
-            grizzlyVault.connect(user).mint(mintAmount, user.address)
-          ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
-        });
+        token0.connect(user).approve(grizzlyVault.address, amount0);
+        token1.connect(user).approve(grizzlyVault.address, amount1);
 
-        it("should revert when missing approval", async () => {
-          const amount0MaxDep = ethers.utils.parseEther("100");
-          const amount1MaxDep = ethers.utils.parseEther("100");
-
-          // Get Mint amounts
-          const amountsDep = await grizzlyVault.getMintAmounts(
-            amount0MaxDep,
-            amount1MaxDep
-          );
-          
-          token0.approve(grizzlyVault.address, amountsDep.amount0);
-          token1.approve(grizzlyVault.address, amountsDep.amount1);
-
-          grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
-
-          const amount0Max = ethers.utils.parseEther("10.0");
-          const amount1Max = ethers.utils.parseEther("10.0");
-          const amounts = await grizzlyVault.getMintAmounts(
-            amount0Max,
-            amount1Max
-          );
-          mintAmount = amounts.mintAmount;
-          amount0 = amounts.amount0;
-          amount1 = amounts.amount1;
-          
-          token0.connect(user).approve(grizzlyVault.address, amount0);
-          // token1.connect(user).approve(grizzlyVault.address, amount1);
-
-          const totalSupplyVault = await grizzlyVault.totalSupply();
-          expect(grizzlyVault.connect(user).mint(mintAmount, user.address))
-          .to.be.revertedWith("ERC20: transfer amount exceeds allowance");
-
-        });
-        it("should revert when mint amount < MIN_INITIAL_SHARES", async () => {
-          const amount0Max = ethers.utils.parseUnits("12.0", 6);
-          const amount1Max = ethers.utils.parseUnits("12.0", 6);
-          const amounts = await grizzlyVault.getMintAmounts(
-            amount0Max,
-            amount1Max
-          );
-          mintAmount = amounts.mintAmount;
-          amount0 = amounts.amount0;
-          amount1 = amounts.amount1;
-          
-          token0.connect(user).approve(grizzlyVault.address, amount0);
-          token1.connect(user).approve(grizzlyVault.address, amount1);
-
-          
-          await expect(grizzlyVault.connect(user).mint(mintAmount, user.address)
-          ).to.be.revertedWith("min shares");
-
-        });
-
+        await expect(
+          grizzlyVault.connect(user).mint(mintAmount, user.address)
+        ).to.be.revertedWith("min shares");
+      });
 
       describe("Burn", () => {
         let mintAmount: BigNumber;
@@ -787,7 +785,7 @@ describe("Grizzly Vault Contracts", () => {
           token0.approve(grizzlyVault.address, amountsDep.amount0);
           token1.approve(grizzlyVault.address, amountsDep.amount1);
 
-          grizzlyVault.mint(amountsDep.mintAmount, grizzlyVault.address);
+          grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
 
           // We mint some tokens to be burned after
           const amount0Max = ethers.utils.parseEther("1.0");
