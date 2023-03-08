@@ -493,6 +493,7 @@ describe("Grizzly Vault Contracts", () => {
           await swapTest.washTrade(
             uniswapPool.address,
             ethers.utils.parseEther("0.5"),
+            10000,
             100,
             2
           );
@@ -536,7 +537,7 @@ describe("Grizzly Vault Contracts", () => {
 
         it("Should gather token0 fees after 0 to 1 swaps", async () => {
           // We generate some swaps
-          await swapTest.washTrade(uniswapPool.address, 50000, 100, 0);
+          await swapTest.washTrade(uniswapPool.address, 50000, 10000, 100, 0);
 
           const fees = await grizzlyVault.estimateFees();
           console.log(fees.token0Fee.toString());
@@ -548,7 +549,7 @@ describe("Grizzly Vault Contracts", () => {
 
         it("Should gather token1 fees after 1 to 0 swaps", async () => {
           // We generate some swaps
-          await swapTest.washTrade(uniswapPool.address, 50000, 100, 1);
+          await swapTest.washTrade(uniswapPool.address, 50000, 10000, 100, 1);
 
           const fees = await grizzlyVault.estimateFees();
           console.log(fees.token0Fee.toString());
@@ -560,7 +561,7 @@ describe("Grizzly Vault Contracts", () => {
 
         it("Should gather both token fees after some swaps", async () => {
           // We generate some swaps
-          await swapTest.washTrade(uniswapPool.address, 50000, 100, 2);
+          await swapTest.washTrade(uniswapPool.address, 50000, 10000, 100, 2);
 
           const fees = await grizzlyVault.estimateFees();
           console.log(fees.token0Fee.toString());
@@ -570,7 +571,23 @@ describe("Grizzly Vault Contracts", () => {
           expect(fees.token1Fee).to.be.gt(0);
         });
       });
+
+      describe("Get position id", () => {
+        it("Should get the correct id", async () => {
+          const id = await grizzlyVault.getPositionID();
+
+          // Manually calculate id
+          const ticks = await grizzlyVault.baseTicks();
+          const code = ethers.utils.solidityKeccak256(
+            ["address", "int24", "int24"],
+            [grizzlyVault.address, ticks.lowerTick, ticks.upperTick]
+          );
+
+          expect(id).to.be.eq(code);
+        });
+      });
     });
+
     describe("User Functions", () => {
       describe("Mint", () => {});
       describe("Burn", () => {
@@ -737,8 +754,236 @@ describe("Grizzly Vault Contracts", () => {
         });
       });
     });
+
     describe("External manager functions", () => {
+      describe("Update config parameters", () => {
+        it("Should revert if not manager", async () => {
+          const newOracleSlippage = 3000;
+          const newOracleSlippageInterval = 10800; //3 minutes
+          const newTreasury = deployerGrizzly.address;
+
+          // run as deployer
+          await expect(
+            grizzlyVault.updateConfigParams(
+              newOracleSlippage,
+              newOracleSlippageInterval,
+              newTreasury
+            )
+          ).to.be.revertedWith("Ownable: caller is not the manager");
+
+          // run as user
+          await expect(
+            grizzlyVault
+              .connect(user)
+              .updateConfigParams(
+                newOracleSlippage,
+                newOracleSlippageInterval,
+                newTreasury
+              )
+          ).to.be.revertedWith("Ownable: caller is not the manager");
+        });
+        it("Should revert with wrong parameters", async () => {
+          const newOracleSlippage = BigNumber.from("1000001");
+          const newOracleSlippageInterval = 10800; //3 minutes
+          const newTreasury = deployerGrizzly.address;
+
+          await expect(
+            grizzlyVault
+              .connect(manager)
+              .updateConfigParams(
+                newOracleSlippage,
+                newOracleSlippageInterval,
+                newTreasury
+              )
+          ).to.be.revertedWith("slippage too high");
+        });
+        it("Should correctly update parameters", async () => {
+          const newOracleSlippage = 3000;
+          const newOracleSlippageInterval = 10800; //3 minutes
+          const newTreasury = deployerGrizzly.address;
+
+          // update parameters and check event
+          await expect(
+            grizzlyVault
+              .connect(manager)
+              .updateConfigParams(
+                newOracleSlippage,
+                newOracleSlippageInterval,
+                newTreasury
+              )
+          )
+            .to.be.emit(grizzlyVault, "UpdateGrizzlyParams")
+            .withArgs(newOracleSlippage, newOracleSlippageInterval);
+
+          // Check the parameters correctly changed
+          const oracleSlippage = await grizzlyVault.oracleSlippage();
+          const oracleSlippageInterval =
+            await grizzlyVault.oracleSlippageInterval();
+          const managerTreasury = await grizzlyVault.managerTreasury();
+
+          expect(oracleSlippage).to.be.eq(newOracleSlippage);
+          expect(oracleSlippageInterval).to.be.eq(newOracleSlippageInterval);
+          expect(managerTreasury).to.be.eq(newTreasury);
+        });
+      });
+
+      describe("Set manager fee", () => {
+        it("Should revert if not manager", async () => {
+          const managerFee = 3000;
+
+          // run as deployer
+          await expect(
+            grizzlyVault.setManagerFee(managerFee)
+          ).to.be.revertedWith("Ownable: caller is not the manager");
+
+          // run as user
+          await expect(
+            grizzlyVault.connect(user).setManagerFee(managerFee)
+          ).to.be.revertedWith("Ownable: caller is not the manager");
+        });
+        it("Should revert with wrong parameters", async () => {
+          const managerFee = BigNumber.from("1000001");
+
+          // try with fee 0
+          await expect(
+            grizzlyVault.connect(manager).setManagerFee(0)
+          ).to.be.revertedWith("invalid manager fee");
+
+          // try with fee too high
+          await expect(
+            grizzlyVault.connect(manager).setManagerFee(managerFee)
+          ).to.be.revertedWith("invalid manager fee");
+        });
+        it("Should correctly update manager fee", async () => {
+          const managerFee = 30000;
+
+          // update fee and check event
+          await expect(grizzlyVault.connect(manager).setManagerFee(managerFee))
+            .to.emit(grizzlyVault, "SetManagerFee")
+            .withArgs(managerFee);
+
+          // Check the fee correctly changed
+          const fee = await grizzlyVault.managerFee();
+          expect(fee).to.be.eq(managerFee);
+        });
+      });
+
+      describe("Set keeper address", () => {
+        it("Should revert if not manager", async () => {
+          const keeperAddress = bot.address;
+
+          // run as deployer
+          await expect(
+            grizzlyVault.setKeeperAddress(keeperAddress)
+          ).to.be.revertedWith("Ownable: caller is not the manager");
+
+          // run as user
+          await expect(
+            grizzlyVault.connect(user).setKeeperAddress(keeperAddress)
+          ).to.be.revertedWith("Ownable: caller is not the manager");
+        });
+
+        it("Should revert with wrong parameters", async () => {
+          const keeperAddress = ethers.constants.AddressZero;
+
+          // try with addreess 0
+          await expect(
+            grizzlyVault.connect(manager).setKeeperAddress(keeperAddress)
+          ).to.be.revertedWith("zeroAddress");
+        });
+
+        it("Should correctly sset keeper address", async () => {
+          const keeperAddress = bot.address;
+
+          // set new address
+          await grizzlyVault.connect(manager).setKeeperAddress(keeperAddress);
+
+          // Check the keeper address correctly changed
+          const keeper = await grizzlyVault.keeperAddress();
+          expect(keeper).to.be.eq(keeperAddress);
+        });
+      });
+
+      describe("Set manager parameters", () => {
+        it("Should revert if not manager", async () => {
+          const slippageUserMax = 7000;
+          const slippageRebalanceMax = 5550;
+
+          // run as deployer
+          await expect(
+            grizzlyVault.setManagerParams(slippageUserMax, slippageRebalanceMax)
+          ).to.be.revertedWith("Ownable: caller is not the manager");
+
+          // run as user
+          await expect(
+            grizzlyVault
+              .connect(user)
+              .setManagerParams(slippageUserMax, slippageRebalanceMax)
+          ).to.be.revertedWith("Ownable: caller is not the manager");
+        });
+        it("Should revert with wrong parameters", async () => {
+          const slippageUserMax = BigNumber.from("1000001");
+          const slippageRebalanceMax = BigNumber.from("1000001");
+
+          await expect(
+            grizzlyVault
+              .connect(manager)
+              .setManagerParams(slippageUserMax, 5550)
+          ).to.be.revertedWith("wrong inputs");
+
+          await expect(
+            grizzlyVault
+              .connect(manager)
+              .setManagerParams(5550, slippageRebalanceMax)
+          ).to.be.revertedWith("wrong inputs");
+
+          await expect(
+            grizzlyVault
+              .connect(manager)
+              .setManagerParams(slippageUserMax, slippageRebalanceMax)
+          ).to.be.revertedWith("wrong inputs");
+        });
+
+        it("Should correctly update parameters", async () => {
+          const slippageUserMax = 7000;
+          const slippageRebalanceMax = 5550;
+
+          // update parameters
+          await grizzlyVault
+            .connect(manager)
+            .setManagerParams(slippageUserMax, slippageRebalanceMax);
+
+          // Check the parameters correctly changed
+          const slippageUser = await grizzlyVault.slippageUserMax();
+          const slippageRebalance = await grizzlyVault.slippageRebalanceMax();
+
+          expect(slippageRebalance).to.be.eq(slippageRebalanceMax);
+          expect(slippageUser).to.be.eq(slippageUserMax);
+        });
+      });
+
       describe("Executive rebalance", () => {
+        beforeEach(async () => {
+          // Deployer loads the pool with some tokens
+          const amount0MaxDep = ethers.utils.parseEther("100");
+          const amount1MaxDep = ethers.utils.parseEther("100");
+
+          const amountsDep = await grizzlyVault.getMintAmounts(
+            amount0MaxDep,
+            amount1MaxDep
+          );
+
+          token0.approve(grizzlyVault.address, amountsDep.amount0);
+          token1.approve(grizzlyVault.address, amountsDep.amount1);
+
+          grizzlyVault.mint(amountsDep.mintAmount, deployerGrizzly.address);
+
+          // We give bot manager authorization
+          await grizzlyVault.connect(manager).setKeeperAddress(bot.address);
+
+          // We first make the evm go some seconds forward
+          await helpers.time.increase(300);
+        });
         it("Should revert if not manager", async () => {
           // run as deployer
           await expect(
@@ -749,6 +994,87 @@ describe("Grizzly Vault Contracts", () => {
           await expect(
             grizzlyVault.connect(user).executiveRebalance(-887220, 887220, 3000)
           ).to.be.revertedWith("Ownable: caller is not the manager");
+
+          // run as bot
+          await expect(
+            grizzlyVault.connect(bot).executiveRebalance(-887220, 887220, 3000)
+          ).to.be.revertedWith("Ownable: caller is not the manager");
+        });
+
+        it("Should revert with wrong parameters", async () => {
+          const id = await grizzlyVault.getPositionID();
+          const liquidity = (await uniswapPool.positions(id))._liquidity;
+
+          await expect(
+            grizzlyVault.connect(manager).executiveRebalance(-30, 30, liquidity)
+          ).to.be.revertedWith("tickSpacing mismatch");
+
+          await expect(
+            grizzlyVault
+              .connect(manager)
+              .executiveRebalance(-60, 60, liquidity.mul(1000))
+          ).to.be.revertedWith("min liquidity");
+        });
+
+        it("Should revert when slippage is high", async () => {
+          // We make some swaps to produce slippage
+          await swapTest.washTrade(
+            uniswapPool.address,
+            ethers.utils.parseEther("0.5"),
+            10000,
+            100,
+            0
+          );
+
+          const id = await grizzlyVault.getPositionID();
+          const liquidity = (await uniswapPool.positions(id))._liquidity;
+
+          await expect(
+            grizzlyVault.connect(manager).executiveRebalance(-60, 60, liquidity)
+          ).to.be.revertedWith("high slippage");
+        });
+
+        it("Should correctly do an executive rebalance", async () => {
+          // We check the tick spacing
+          const tickSpacing = await uniswapPool.tickSpacing();
+
+          // We read some values from the vault
+          let id = await grizzlyVault.getPositionID();
+          let liquidity = (await uniswapPool.positions(id))._liquidity;
+
+          // We perform a rebalance on a tight interval
+          const tx = await grizzlyVault
+            .connect(manager)
+            .executiveRebalance(-2 * tickSpacing, 2 * tickSpacing, liquidity);
+
+          // Check event emission
+          const receipt = await tx.wait();
+          const events = receipt.events?.filter((x) => {
+            return x.event == "Rebalance";
+          });
+          if (!events) {
+            throw new Error("No events when rebalance");
+          }
+
+          // Read new values from the vault
+          const ticks = await grizzlyVault.baseTicks();
+          id = await grizzlyVault.getPositionID();
+          const newLiquidity = (await uniswapPool.positions(id))._liquidity;
+
+          // Check event parameters
+          const args = events[0].args;
+          if (!args) {
+            throw new Error("Event has no args");
+          }
+          expect(ticks.lowerTick).to.be.eq(args[0]);
+          expect(ticks.upperTick).to.be.eq(args[1]);
+          expect(liquidity).to.be.eq(args[2]);
+          expect(newLiquidity).to.be.eq(args[3]);
+
+          //Check change in liquidity and ticks
+          expect(newLiquidity).to.be.gt(liquidity);
+          expect(ticks.lowerTick).to.be.eq(-2 * tickSpacing);
+          expect(ticks.upperTick).to.be.eq(2 * tickSpacing);
         });
       });
     });
@@ -772,6 +1098,9 @@ describe("Grizzly Vault Contracts", () => {
 
           // We give bot manager authorization
           await grizzlyVault.connect(manager).setKeeperAddress(bot.address);
+
+          // We first make the evm go some seconds forward
+          await helpers.time.increase(300);
         });
         it("Should revert if not authorized", async () => {
           // run rebalance as deployer
@@ -784,23 +1113,32 @@ describe("Grizzly Vault Contracts", () => {
             grizzlyVault.connect(user).rebalance()
           ).to.be.revertedWith("not authorized");
         });
-        it("Should revert if liquidity did not increase", async () => {
-          // We first make the evm go some second forward
-          await helpers.time.increase(300);
+        it("Should revert when slippage is high", async () => {
+          // We make some swaps to produce slippage
+          await swapTest.washTrade(
+            uniswapPool.address,
+            ethers.utils.parseEther("0.5"),
+            10000,
+            100,
+            0
+          );
 
+          await expect(
+            grizzlyVault.connect(manager).rebalance()
+          ).to.be.revertedWith("high slippage");
+        });
+        it("Should revert if liquidity did not increase", async () => {
           await expect(
             grizzlyVault.connect(manager).rebalance()
           ).to.be.revertedWith("liquidity must increase");
         });
         it("Should let bot and manager to rebalance", async () => {
-          // We first make the evm go some seconds forward
-          await helpers.time.increase(300);
-
           // We make some swaps to generate fees
           await swapTest.washTrade(
             uniswapPool.address,
-            ethers.utils.parseEther("0.5"),
-            100,
+            ethers.utils.parseEther("0.1"),
+            10000,
+            10,
             2
           );
 
@@ -840,7 +1178,8 @@ describe("Grizzly Vault Contracts", () => {
           await swapTest.washTrade(
             uniswapPool.address,
             ethers.utils.parseEther("0.5"),
-            100,
+            10000,
+            10,
             2
           );
 
@@ -873,6 +1212,7 @@ describe("Grizzly Vault Contracts", () => {
           await swapTest.washTrade(
             uniswapPool.address,
             ethers.utils.parseEther("0.5"),
+            10000,
             100,
             2
           );
@@ -978,6 +1318,7 @@ describe("Grizzly Vault Contracts", () => {
           await swapTest.washTrade(
             uniswapPool.address,
             ethers.utils.parseEther("0.5"),
+            10000,
             100,
             2
           );
