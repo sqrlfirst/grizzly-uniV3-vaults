@@ -47,8 +47,8 @@ abstract contract GrizzlyVaultStorage is
 	/* solhint-enable */
 
 	// How much slippage we allow between swaps -> 5000 = 0.5% slippage
-	uint24 public slippageUserMax = 10000;
-	uint24 public slippageRebalanceMax = 10000;
+	uint24 public slippageUserMax;
+	uint24 public slippageRebalanceMax;
 
 	address public immutable factory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
 
@@ -92,8 +92,10 @@ abstract contract GrizzlyVaultStorage is
 		managerFee = _managerFee; // if set to 0 here manager can still initialize later
 
 		// These variables can be updated by the manager
+		slippageUserMax = 5000; // default: 0.5% slippage
+		slippageRebalanceMax = 5000; // default: 0.5% slippage
 		oracleSlippageInterval = 5 minutes; // default: last five minutes;
-		oracleSlippage = 50000; // default: 5% slippage
+		oracleSlippage = 5000; // default: 0.5% slippage
 
 		managerTreasury = _manager_; // default: treasury is admin
 
@@ -108,7 +110,7 @@ abstract contract GrizzlyVaultStorage is
 	}
 
 	/// @notice Change configurable parameters, only manager can call
-	/// @param newOracleSlippage Maximum slippage on swaps during gelato rebalance
+	/// @param newOracleSlippage Maximum slippage on swaps during Grizzly rebalance
 	/// @param newOracleSlippageInterval Length of time for TWAP used in computing slippage on swaps
 	/// @param newTreasury Address where managerFee withdrawals are sent
 	function updateConfigParams(
@@ -128,7 +130,7 @@ abstract contract GrizzlyVaultStorage is
 	/// @notice setManagerFee sets a managerFee, only manager can call
 	/// @param _managerFee Proportion of fees earned that are credited to manager in Basis Points
 	function setManagerFee(uint24 _managerFee) external onlyManager {
-		require(_managerFee > 0 && _managerFee <= basisOne, "fee too high");
+		require(_managerFee > 0 && _managerFee <= basisOne, "invalid manager fee");
 		emit SetManagerFee(_managerFee);
 		managerFee = _managerFee;
 	}
