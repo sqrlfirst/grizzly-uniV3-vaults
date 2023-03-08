@@ -4,6 +4,7 @@ pragma solidity 0.8.18;
 import { OwnableUninitialized } from "./OwnableUninitialized.sol";
 import { IUniswapV3Pool } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import { IUniswapV3TickSpacing } from "../interfaces/IUniswapV3TickSpacing.sol";
+import { TickMath } from "../uniswap/TickMath.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // solhint-disable max-line-length
 import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
@@ -160,6 +161,11 @@ abstract contract GrizzlyVaultStorage is
 		int24 upperTick
 	) internal view returns (bool) {
 		int24 spacing = IUniswapV3TickSpacing(uniPool).tickSpacing();
-		return lowerTick < upperTick && lowerTick % spacing == 0 && upperTick % spacing == 0;
+		return
+			lowerTick < upperTick &&
+			lowerTick % spacing == 0 &&
+			upperTick % spacing == 0 &&
+			lowerTick >= TickMath.MIN_TICK &&
+			upperTick <= TickMath.MAX_TICK;
 	}
 }

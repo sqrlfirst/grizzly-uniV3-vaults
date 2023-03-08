@@ -5,6 +5,7 @@ import { IUniswapV3Factory } from "@uniswap/v3-core/contracts/interfaces/IUniswa
 import { IUniswapV3TickSpacing } from "./interfaces/IUniswapV3TickSpacing.sol";
 import { IGrizzlyVaultFactory } from "./interfaces/IGrizzlyVaultFactory.sol";
 import { IGrizzlyVaultStorage } from "./interfaces/IGrizzlyVaultStorage.sol";
+import { TickMath } from "./uniswap/TickMath.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -136,7 +137,12 @@ contract GrizzlyVaultFactory is IGrizzlyVaultFactory, Ownable {
 		int24 upperTick
 	) internal view returns (bool) {
 		int24 spacing = IUniswapV3TickSpacing(uniPool).tickSpacing();
-		return lowerTick < upperTick && lowerTick % spacing == 0 && upperTick % spacing == 0;
+		return
+			lowerTick < upperTick &&
+			lowerTick % spacing == 0 &&
+			upperTick % spacing == 0 &&
+			lowerTick >= TickMath.MIN_TICK &&
+			upperTick <= TickMath.MAX_TICK;
 	}
 
 	function _getTokenOrder(
