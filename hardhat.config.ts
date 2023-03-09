@@ -80,12 +80,12 @@ const config: HardhatUserConfig = {
     target: "ethers-v5",
   },
 
-  // contractSizer: {
-  //   alphaSort: true,
-  //   disambiguatePaths: false,
-  //   runOnCompile: true,
-  //   strict: true,
-  // },
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: true,
+    strict: true,
+  },
 
   warnings: {
     // removes pure/view mutability warning:
