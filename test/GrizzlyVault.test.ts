@@ -6,7 +6,6 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import * as helpers from "@nomicfoundation/hardhat-network-helpers";
 
 import {
-  IERC20,
   IUniswapV3Factory,
   IUniswapV3Pool,
   GrizzlyVault,
@@ -16,6 +15,7 @@ import {
 } from "../typechain";
 import { pools } from "./data/pools";
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
 bn.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
 
 // returns the sqrt price as a 64x96
@@ -796,7 +796,7 @@ describe("Grizzly Vault Contracts", () => {
           let mintAmount: BigNumber;
           let amount0: BigNumber;
           let amount1: BigNumber;
-          let defaultMaxSlippage = BigNumber.from("5000");
+          const defaultMaxSlippage = BigNumber.from("5000");
 
           beforeEach(async () => {
             // Deployer loads the pool with some tokens
@@ -1249,7 +1249,7 @@ describe("Grizzly Vault Contracts", () => {
 
             // We read some values from the vault
             let id = await grizzlyVault.getPositionID();
-            let liquidity = (await uniswapPool.positions(id))._liquidity;
+            const liquidity = (await uniswapPool.positions(id))._liquidity;
 
             // We perform a rebalance on a tight interval
             const tx = await grizzlyVault
@@ -1557,6 +1557,7 @@ describe("Grizzly Vault Contracts", () => {
   describe("Test with mainnet pools", () => {
     pools.slice(0, 1).forEach((pool) => {
       describe(`Testing in ${pool.name} pool`, () => {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
         let zeroForOne: boolean;
         let fee: number;
         let tick: number;
@@ -1924,7 +1925,7 @@ describe("Grizzly Vault Contracts", () => {
                 let amount0Max = ethers.utils.parseUnits("100", token0Decimals);
                 let amount1Max = ethers.utils.parseUnits("100", token1Decimals);
 
-                let amounts = await grizzlyVault.getMintAmounts(
+                const amounts = await grizzlyVault.getMintAmounts(
                   amount0Max,
                   amount1Max
                 );
@@ -2362,7 +2363,7 @@ describe("Grizzly Vault Contracts", () => {
               let mintAmount: BigNumber;
               let amount0: BigNumber;
               let amount1: BigNumber;
-              let defaultMaxSlippage = BigNumber.from("5000");
+              const defaultMaxSlippage = BigNumber.from("5000");
 
               beforeEach(async () => {
                 // We mint some tokens to be burned after
@@ -2780,7 +2781,7 @@ describe("Grizzly Vault Contracts", () => {
               it("Should correctly do an executive rebalance", async () => {
                 // We read some values from the vault
                 let id = await grizzlyVault.getPositionID();
-                let liquidity = (await uniswapPool.positions(id))._liquidity;
+                const liquidity = (await uniswapPool.positions(id))._liquidity;
 
                 // We perform a rebalance on a tight interval
                 const tx = await grizzlyVault

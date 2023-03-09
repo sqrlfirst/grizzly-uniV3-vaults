@@ -6,6 +6,5 @@ module.exports = {
     "interfaces",
     "uniswap",
     "node_modules",
-    "contracts"
   ],
 };

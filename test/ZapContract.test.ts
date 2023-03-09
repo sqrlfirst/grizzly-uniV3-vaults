@@ -6,15 +6,16 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import * as helpers from "@nomicfoundation/hardhat-network-helpers";
 
 import {
-  ERC20,
   IUniswapV3Factory,
   IUniswapV3Pool,
   GrizzlyVault,
   GrizzlyVaultFactory,
   ZapContract,
+  ERC20Upgradeable,
 } from "../typechain";
 import { pools } from "./data/pools";
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
 bn.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
 
 // returns the sqrt price as a 64x96
@@ -37,9 +38,8 @@ describe("ZapContract", () => {
   let uniswapFactory: IUniswapV3Factory;
   let uniswapPool: IUniswapV3Pool;
 
-  let token0: ERC20;
-  let token1: ERC20;
-  let grizzlyCoreVault: GrizzlyVault;
+  let token0: ERC20Upgradeable;
+  let token1: ERC20Upgradeable;
   let grizzlyVault: GrizzlyVault;
   let grizzlyFactory: GrizzlyVaultFactory;
   let zapContract: ZapContract;
@@ -67,10 +67,6 @@ describe("ZapContract", () => {
 
     // We load the deployment fixtures of hardhat-deploy
     await deployments.fixture(["local"]);
-    grizzlyCoreVault = await ethers.getContract(
-      "GrizzlyVault",
-      deployerGrizzly
-    );
     grizzlyFactory = await ethers.getContract(
       "GrizzlyVaultFactory",
       deployerGrizzly
@@ -538,6 +534,7 @@ describe("ZapContract", () => {
   describe("ZapIn in mainnet tokens and pools", () => {
     pools.forEach((pool) => {
       describe(`ZapIn in ${pool.name} pool`, () => {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
         let zeroForOne: boolean;
         let fee: number;
         let tick: number;
@@ -552,8 +549,14 @@ describe("ZapContract", () => {
             pool.address
           )) as IUniswapV3Pool;
 
-          token0 = (await ethers.getContractAt("ERC20", pool.token0)) as ERC20;
-          token1 = (await ethers.getContractAt("ERC20", pool.token1)) as ERC20;
+          token0 = (await ethers.getContractAt(
+            "ERC20Upgradeable",
+            pool.token0
+          )) as ERC20Upgradeable;
+          token1 = (await ethers.getContractAt(
+            "ERC20Upgradeable",
+            pool.token1
+          )) as ERC20Upgradeable;
 
           token0Decimals = await token0.decimals();
           token1Decimals = await token1.decimals();
