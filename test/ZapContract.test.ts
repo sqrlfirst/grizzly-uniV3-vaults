@@ -572,7 +572,6 @@ describe("ZapContract", () => {
             .mul(BigNumber.from(10).pow(token0Decimals / 2))
             .div(BigNumber.from(10).pow(token1Decimals / 2));
           zeroForOne = sqrtPrice.gt(BigNumber.from(2).pow(96));
-          console.log("ZERO FOR ONE", zeroForOne);
         });
 
         beforeEach(async () => {
