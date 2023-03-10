@@ -29,10 +29,6 @@ const config: HardhatUserConfig = {
     manager: 1,
   },
 
-  etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
-  },
-
   networks: {
     mainnet: {
       accounts: DEPLOYER_PK_MAINNET ? [DEPLOYER_PK_MAINNET] : [],
@@ -43,6 +39,11 @@ const config: HardhatUserConfig = {
       accounts: DEPLOYER_PK ? [DEPLOYER_PK] : [],
       chainId: 5,
       url: `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_ID}`,
+    },
+    sepolia: {
+      accounts: DEPLOYER_PK ? [DEPLOYER_PK] : [],
+      chainId: 5,
+      url: `https://eth-sepolia.alchemyapi.io/v2/${ALCHEMY_ID}`,
     },
     localhost: {
       chainId: 1,
@@ -73,6 +74,12 @@ const config: HardhatUserConfig = {
         },
       },
     ],
+  },
+
+  verify: {
+    etherscan: {
+      apiKey: process.env.ETHERSCAN_API_KEY,
+    },
   },
 
   typechain: {
