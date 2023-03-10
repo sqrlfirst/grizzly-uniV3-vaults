@@ -152,7 +152,7 @@ These clones have the exact same logic as the implementation contract but with i
 		address tokenA,
 		address tokenB,
 		uint24 uniFee,
-		uint16 managerFee,
+		uint24 managerFee,
 		int24 lowerTick,
 		int24 upperTick,
 		address manager
@@ -164,13 +164,45 @@ Arguments:
 - `tokenA` one of the tokens in the uniswap pair
 - `tokenB` the other token in the uniswap pair
 - `uniFee` fee tier of the uniswap pair
-- `managerFee` proportion of earned fees that go to pool manager in bps
+- `managerFee` proportion of earned fees that go to pool manager
 - `lowerTick` initial lower bound of the Uniswap V3 position
 - `upperTick` initial upper bound of the Uniswap V3 position
 - `manager` address of the manager of the new Vault
 
-# Test
+## Project set up
+
+### Dependencies
+
+To install all the dependencies run
 
 ```
-yarn test
+yarn
+```
+
+### Tests
+
+Tests are performed on a mainnet fork. Set your Alchemy key on an .env file. See [.env.example](/.env.example).
+
+Some tests are performed on mainnet pools. To configure the information of these pools check [this file](/test/data/pools.ts).
+
+To perform all the tests run
+
+```
+yarn hardhat test
+```
+
+### Deployement
+
+To deploy contracts, first set up your private key in a .env file, as in [.env.example](/.env.example), and run:
+
+```bash
+yarn hardhat deploy --network <network> --tags <network>
+```
+
+### Verify on Etherscan
+
+To verify your deployed contracts, first set up your Etherscan API key in a .env file, as in [.env.example](/.env.example), and run:
+
+```bash
+yarn hardhat --network <network> etherscan-verify
 ```
