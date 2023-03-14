@@ -1,7 +1,7 @@
 import { ethers, run, network } from "hardhat";
-import { Contract, ContractFactory } from "ethers";
+import { ContractFactory } from "ethers";
 
-const MULTI_SIG_GRIZZLY_ETH = "0xcE88F73FAA2C8de5fdE0951A6b80583af4C14265";
+//const MULTI_SIG_GRIZZLY_ETH = "0xcE88F73FAA2C8de5fdE0951A6b80583af4C14265";
 
 async function main() {
   console.log(new Date().toUTCString());

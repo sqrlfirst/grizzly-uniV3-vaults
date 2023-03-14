@@ -3,4 +3,5 @@ dist
 cache
 coverage
 coverage.json
+node_modules
 

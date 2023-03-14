@@ -3,11 +3,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 
 const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
-  if (
-    hre.network.name === "mainnet" ||
-    hre.network.name === "optimism" ||
-    hre.network.name === "polygon"
-  ) {
+  if (hre.network.name === "mainnet") {
     console.log(
       `!! Deploying MockERC20 to ${hre.network.name}. Hit ctrl + c to abort`
     );
@@ -17,20 +13,39 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
 
-  await deploy("MockERC20", {
+  await deploy("TokenA", {
+    contract: "MockERC20",
     from: deployer,
+    proxy: {
+      execute: {
+        methodName: "initialize",
+        args: ["Token A", "TOKENA"],
+      },
+    },
+    log: true,
+    autoMine: true,
+  });
+
+  await deploy("TokenB", {
+    contract: "MockERC20",
+    from: deployer,
+    proxy: {
+      execute: {
+        methodName: "initialize",
+        args: ["Token B", "TOKENB"],
+      },
+    },
+    log: true,
+    autoMine: true,
   });
 };
 
 func.skip = async (hre: HardhatRuntimeEnvironment) => {
   const shouldSkip =
-    hre.network.name === "mainnet" ||
-    hre.network.name === "polygon" ||
-    hre.network.name === "optimism" ||
-    hre.network.name === "goerli";
+    hre.network.name === "mainnet" || hre.network.name === "goerli";
   return shouldSkip ? true : false;
 };
 
-func.tags = ["MockERC20"];
+func.tags = ["MockERC20", "local"];
 
 export default func;

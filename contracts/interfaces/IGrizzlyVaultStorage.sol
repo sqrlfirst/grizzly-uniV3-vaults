@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.4;
+pragma solidity 0.8.18;
 
 interface IGrizzlyVaultStorage {
 	// Needed to avoid error compiler stack too deep
-	struct LocalVariables_burn {
+	struct LocalVariablesBurn {
 		uint256 totalSupply;
 		uint256 liquidityBurnt;
 		int256 amount0Delta;
@@ -19,9 +19,10 @@ interface IGrizzlyVaultStorage {
 		string memory _name,
 		string memory _symbol,
 		address _pool,
-		uint16 _managerFeeBPS,
+		uint24 _managerFee,
 		int24 _lowerTick,
 		int24 _upperTick,
 		address _manager
 	) external;
 }
+
