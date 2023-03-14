@@ -865,9 +865,17 @@ describe("Grizzly Vault Contracts", () => {
             const token0BalanceAfter = await token0.balanceOf(user.address);
             const token1BalanceAfter = await token1.balanceOf(user.address);
 
+            console.log("token0BalanceAfter", token0BalanceAfter.toString());
+
             expect(lpBalanceAfter).to.be.eq(BigNumber.from(0));
-            expect(token0BalanceAfter).to.be.gt(token0BalanceBefore);
-            expect(token1BalanceAfter).to.be.gt(token1BalanceBefore);
+
+            // We compare deltas with initial amount
+            expect(token0BalanceAfter.sub(token0BalanceBefore)).to.be.gt(
+              amount0.mul(999).div(1000)
+            );
+            expect(token1BalanceAfter.sub(token1BalanceBefore)).to.be.gt(
+              amount1.mul(999).div(1000)
+            );
           });
 
           it("Should burn and receive only token 0 with high slippage", async () => {
@@ -885,8 +893,16 @@ describe("Grizzly Vault Contracts", () => {
             const token1BalanceAfter = await token1.balanceOf(user.address);
 
             expect(lpBalanceAfter).to.be.eq(BigNumber.from(0));
-            expect(token0BalanceAfter).to.be.gt(token0BalanceBefore);
             expect(token1BalanceAfter).to.be.eq(token1BalanceBefore);
+
+            // We compare delta with initial amount and slippage
+            const estimatedAmount0 = amount0
+              .mul(999)
+              .div(1000)
+              .add(amount1.mul(950).div(1000));
+            expect(token0BalanceAfter.sub(token0BalanceBefore)).to.be.gt(
+              estimatedAmount0
+            );
           });
 
           it("Should burn and receive only token 1 with high slippage", async () => {
@@ -905,7 +921,15 @@ describe("Grizzly Vault Contracts", () => {
 
             expect(lpBalanceAfter).to.be.eq(BigNumber.from(0));
             expect(token0BalanceAfter).to.be.eq(token0BalanceBefore);
-            expect(token1BalanceAfter).to.be.gt(token1BalanceBefore);
+
+            // We compare delta with initial amount and slippage
+            const estimatedAmount1 = amount1
+              .mul(999)
+              .div(1000)
+              .add(amount0.mul(950).div(1000));
+            expect(token1BalanceAfter.sub(token1BalanceBefore)).to.be.gt(
+              estimatedAmount1
+            );
           });
 
           it("Should burn and receive token 0 and some dust token 1 with low slippage", async () => {
@@ -923,7 +947,9 @@ describe("Grizzly Vault Contracts", () => {
             const token1BalanceAfter = await token1.balanceOf(user.address);
 
             expect(lpBalanceAfter).to.be.eq(BigNumber.from(0));
-            expect(token0BalanceAfter).to.be.gt(token0BalanceBefore);
+            expect(token0BalanceAfter.sub(token0BalanceBefore)).to.be.gt(
+              amount0
+            );
             expect(token1BalanceAfter).to.be.gt(token1BalanceBefore);
           });
 
@@ -943,7 +969,9 @@ describe("Grizzly Vault Contracts", () => {
 
             expect(lpBalanceAfter).to.be.eq(BigNumber.from(0));
             expect(token0BalanceAfter).to.be.gt(token0BalanceBefore);
-            expect(token1BalanceAfter).to.be.gt(token1BalanceBefore);
+            expect(token1BalanceAfter.sub(token1BalanceBefore)).to.be.gt(
+              amount1
+            );
           });
         });
       });
