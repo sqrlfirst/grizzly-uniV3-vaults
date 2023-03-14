@@ -42,7 +42,7 @@ const config: HardhatUserConfig = {
     },
     sepolia: {
       accounts: DEPLOYER_PK ? [DEPLOYER_PK] : [],
-      chainId: 5,
+      chainId: 11155111,
       url: `https://eth-sepolia.alchemyapi.io/v2/${ALCHEMY_ID}`,
     },
     localhost: {
